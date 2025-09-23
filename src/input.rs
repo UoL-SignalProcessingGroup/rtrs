@@ -1,10 +1,8 @@
 pub mod config {
-    use ndarray::Array3;
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
     pub struct SoundSpeed {
-        pub interp_type: String, // "tabulated" (for now)
         pub x_ssp_m: Vec<f64>, // x (m)
         pub y_ssp_m: Vec<f64>, // y (m)
         pub z_ssp_m: Vec<f64>, // z (m, positive down)
@@ -13,11 +11,9 @@ pub mod config {
 
     #[derive(Debug, Deserialize)]
     pub struct Bathymetry {
-        pub kind: String, // "flat" or "3D"
-        pub flat_depth_m: Option<f64>, // for "flat" kind
-        pub x_bty_m: Option<Vec<f64>>, // x (m)
-        pub y_bty_m: Option<Vec<f64>>, // y (m)
-        pub z_bty_m: Option<Vec<f64>>, // z (m, positive down)
+        pub x_bty_m: Vec<f64>, // x (m)
+        pub y_bty_m: Vec<f64>, // y (m)
+        pub z_bty_m: Vec<f64>, // z (m, positive down)
         pub density_g_cm3: Vec<f64>, // bottom density (g/cm^3)
         pub c_bty_m_s: Vec<f64>, // bottom sound speed (m/s)
         pub attenuation_db_per_wavelength: Vec<f64>, // bottom attenuation (dB/wavelength)
@@ -47,7 +43,8 @@ pub mod config {
     #[derive(Debug, Deserialize)]
     pub struct BeamSettings {
         pub step_m: f64,
-        pub beam_type: String, 
+        pub max_steps: usize,
+        pub max_range_m: f64,
     }
 
     #[derive(Debug, Deserialize)]

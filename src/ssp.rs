@@ -220,7 +220,13 @@ fn partial_z(c: &Array3<f64>, dz: f64) -> Array3<f64> {
 }
 
 
-fn trilinear_interpolation(position: [f64; 3], field: &Array3<f64>, x: &[f64], y: &[f64], z: &[f64]) -> f64 {
+fn trilinear_interpolation(
+    position: [f64; 3], 
+    field: &Array3<f64>, 
+    x: &[f64], 
+    y: &[f64], 
+    z: &[f64]
+) -> f64 {
     // Trilinear interpolation of field at position [x, y, z]
 
     // Find indices function  i, j, k such that x[i] <= position[0] < x[i+1], etc.

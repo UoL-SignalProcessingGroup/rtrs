@@ -1,5 +1,6 @@
 use ndarray::array;
 
+use crate::bty;
 use crate::input::config::SimulationConfig;
 use crate::ssp::{
     interpolate_c, 
@@ -10,7 +11,7 @@ use crate::ssp::{
 };
 
 use crate::reflect::{
-    surface_reflection
+    bottom_reflections, surface_reflection
 };
 
 #[derive(Clone)]
@@ -19,11 +20,11 @@ pub struct Ray {
     pub direction: [f64; 3],
     c: f64,
     phi: f64, // ray torsion 
-    travel_time: f64,
+    pub travel_time: f64,
     amplitude: f64,
     pub phase: f64,
     pub num_top_bounces: u32,
-    num_bottom_bounces: u32,
+    pub num_bottom_bounces: u32,
     p_tilde: [f64; 2], // paraxial vectors
     q_tilde: [f64; 2],
     p_hat: [f64; 2],
@@ -31,12 +32,18 @@ pub struct Ray {
 }
 
 
-pub fn trace_ray(azim: f64, elev: f64, config: &SimulationConfig, ssp_field: &SSPFields) -> Vec<Ray> {
+pub fn trace_ray(
+    azim: f64, 
+    elev: f64, 
+    config: &SimulationConfig, 
+    ssp_field: &SSPFields,
+    bty_field: &bty::BTYfield
+) -> Vec<Ray> {
     // ray tracing main loop
 
     // println!("Tracing ray at elev {:.2} deg, azim {:.2} deg", elev.to_degrees(), azim.to_degrees());
 
-    let max_n_steps = 50000;
+    let max_n_steps = config.beam.max_steps;
 
     let c = interpolate_c(config.source.position, &ssp_field);
 
@@ -66,8 +73,12 @@ pub fn trace_ray(azim: f64, elev: f64, config: &SimulationConfig, ssp_field: &SS
 
         // check for boundary reflections
         surface_reflection(&mut ray_history);
+        bottom_reflections(&mut ray_history, bty_field);
 
         // check for termination conditions
+        if check_max_range(&mut ray_history, config.beam.max_range_m) {
+            break;
+        }
         
     }
 
@@ -189,4 +200,11 @@ fn ray_normal(direction: [f64; 3], phi: f64, c: f64) -> ([f64; 3], [f64; 3]) {
         e2[2] = 0.0;
     }
     return (e1, e2);
+}
+
+
+fn check_max_range(ray_history: &mut Vec<Ray>, max_range: f64) -> bool {
+    let ray = ray_history.last().unwrap();
+    let range = (ray.position[0].powi(2) + ray.position[1].powi(2)).sqrt();
+    return range >= max_range;
 }

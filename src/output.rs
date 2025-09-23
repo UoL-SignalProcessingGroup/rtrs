@@ -1,7 +1,7 @@
 use anyhow::Result;
 use hdf5_metno as hdf5;
 
-use crate::input::config::SimulationConfig;
+use crate::{bty, input::config::SimulationConfig};
 
 
 pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_paths: Vec<Vec<[f64; 3]>>) -> Result<()> {
@@ -23,6 +23,10 @@ pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_pat
         rays.new_dataset_builder().with_data(path).create(ds_name.as_str())?;
     }
 
+    let bty = file.create_group("bty")?;
+    bty.new_dataset_builder().with_data(&simulation_config.bathymetry.x_bty_m).create("x_bty_m")?;
+    bty.new_dataset_builder().with_data(&simulation_config.bathymetry.y_bty_m).create("y_bty_m")?;
+    bty.new_dataset_builder().with_data(&simulation_config.bathymetry.z_bty_m).create("z_bty_m")?;
 
     Ok(())
 }

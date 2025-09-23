@@ -20,7 +20,7 @@ def munk(Z, min_c=1500.0, epsilon=0.00737, min_z1=1300.0, min_z2=1300.0):
 
 
 # munk stuff
-z = np.linspace(0.0, 5000.0, 15)
+z = np.linspace(0.0, 5000.0, 50)
 munk_ssp = munk(z)
 print("Munk SSP (1D):", munk_ssp)
 # Tile munk_ssp into a 3D array of shape (2, 2, len(munk_ssp))
@@ -41,7 +41,7 @@ print(" SSP (3D):", ssp_pekeris_3d)
 print(" SSP (flattened 3D):", ssp_pekeris_3d_flat)
 
 rcvr_ranges = np.linspace(0.0, 5000.0, 500)
-alpha = np.linspace(-20.0, 10.0, 8)
+alpha = np.linspace(-15.0, 15.0, 8)
 
 
 
@@ -54,17 +54,15 @@ env_p = {
         "c_m_s": list(ssp_pekeris_3d_flat)
     },
     "bathymetry": {
-        "kind": "flat",
-        "flat_depth_m": 100.0,
-        "x_bty_m": None,
-        "y_bty_m": None,
-        "z_bty_m": None,
-        "density_g_cm3": [2.0],
-        "c_bty_m_s": [1600.0],
-        "attenuation_db_per_wavelength": [0.5]
+        "x_bty_m": [0.0, 5000.0],
+        "y_bty_m": [0.0, 5000.0],
+        "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
+        "density_g_cm3": [1.6],
+        "c_bty_m_s": [1700.0],
+        "attenuation_db_per_wavelength": [0.2]
     },
     "source": {
-        "position": [0.0, 0.0, 10.0],
+        "position": [0.0, 0.0, 50.0],
         "freq_hz": 1000.0,
         "launch_elev_deg": list(alpha),
         "launch_azim_deg": [0.0]
@@ -80,7 +78,8 @@ env_p = {
     },
     "beam": {
         "step_m": 1.0,
-        "beam_type": "ray"
+        "max_steps": 10_000,
+        "max_range_m": 10_000.0
     }
 }
 
@@ -93,11 +92,9 @@ env_m = {
         "c_m_s": list(munk_ssp_3d_flat)
     },
     "bathymetry": {
-        "kind": "flat",
-        "flat_depth_m": 5000.0,
-        "x_bty_m": None,
-        "y_bty_m": None,
-        "z_bty_m": None,
+        "x_bty_m": [0.0, 50000.0],
+        "y_bty_m": [0.0, 50000.0],
+        "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
         "density_g_cm3": [1.6],
         "c_bty_m_s": [1700.0],
         "attenuation_db_per_wavelength": [0.2]
@@ -119,7 +116,56 @@ env_m = {
     },
     "beam": {
         "step_m": 1.0,
-        "beam_type": "ray"
+        "max_steps": 100_000,
+        "max_range_m": 50_000.0
+    }
+}
+
+# Create bathymetry (bty) array: at x=0, z=1000; at x=5000, z=0
+x_bty = np.array([0.0, 50000.0])
+y_bty = np.array([0.0, 50000.0])
+z_bty = np.array([[1000.0, 0.0], [1000.0, 0.0]])  # shape (2,2): constant along y
+
+# Flatten z_bty in row-major order
+z_bty_flat = z_bty.flatten(order='C')
+
+env_bty = {
+    "ssp": {
+        "interp_type": "tabulated",
+        "x_ssp_m": [0.0, 5000.0],
+        "y_ssp_m": [0.0, 5000.0],
+        "z_ssp_m": [0.0, 100.0],
+        "c_m_s": list(ssp_pekeris_3d_flat)
+    },
+    "bathymetry": {
+        "kind": "tabulated",
+        "flat_depth_m": None,
+        "x_bty_m": list(x_bty),
+        "y_bty_m": list(y_bty),
+        "z_bty_m": list(z_bty_flat),
+        "density_g_cm3": [2.0],
+        "c_bty_m_s": [1600.0],
+        "attenuation_db_per_wavelength": [0.5]
+    },
+    "source": {
+        "position": [0.0, 25000.0, 50.0],
+        "freq_hz": 1000.0,
+        "launch_elev_deg": np.linspace(-50.0, 50.0, 1).tolist(),
+        "launch_azim_deg": np.linspace(30.0, 150.0, 5).tolist()
+    },
+    "receivers": {
+        "kind": "cylindrical",
+        "ranges_m": list(rcvr_ranges),
+        "bearings_deg": [0.0],
+        "depths_m": [50.0],
+        "x_rcvr_m": None,
+        "y_rcvr_m": None,
+        "z_rcvr_m": None
+    },
+    "beam": {
+        "step_m": 1.0,
+        "max_steps": 10_000,
+        "max_range_m": 10_000.0
     }
 }
 
@@ -129,6 +175,9 @@ with open("examples/testp.json", "w") as f:
 
 with open("examples/testm.json", "w") as f:
     json.dump(env_m, f, indent=2)
+
+with open("examples/testb.json", "w") as f:
+    json.dump(env_bty, f, indent=2)
 
 
 

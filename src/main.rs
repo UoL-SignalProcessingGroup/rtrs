@@ -2,6 +2,7 @@ mod input;
 mod output;
 mod rays;
 mod ssp;
+mod bty;
 mod reflect;
 
 use anyhow::Result;
@@ -58,13 +59,14 @@ fn core(cfg: &SimulationConfig) -> Vec<Vec<[f64; 3]>> {
     let mut pressure_field_real = vec![0.0; n_r_rcvr * n_bear_rcvr * n_depths_rcvr];
 
     let ssp_field = init_ssp(cfg);
+    let bty_field = bty::init_bty(cfg);
 
     // loop over launch angles
     for &azim in &launch_azim_rad {
         for &elev in &launch_elev_rad {
             
             // trace rays
-            let ray_history = trace_ray(azim, elev, cfg, &ssp_field);
+            let ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
 
             // beam influence
 
