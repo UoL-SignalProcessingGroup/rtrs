@@ -367,6 +367,7 @@ dependencies = [
  "anyhow",
  "hdf5-metno",
  "ndarray",
+ "num-complex",
  "serde",
  "serde_json",
 ]

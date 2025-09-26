@@ -4,13 +4,18 @@ mod rays;
 mod ssp;
 mod bty;
 mod reflect;
+mod influence;
+mod utils;
 
 use anyhow::Result;
 use std::fs;
+
 use input::config::SimulationConfig;
 use output::write_hdf5;
-use rays::{trace_ray, Ray};
+use rays::trace_ray;
 use ssp::init_ssp;
+// use influence::{gaussian_beam_influence, init_pressure_field, PressureField};
+use influence::{hat_beam_influence, init_pressure_field, PressureField};
 
 fn load_config(path: &str) -> Result<SimulationConfig> {
     let text = fs::read_to_string(path)?;
@@ -29,7 +34,7 @@ fn main() -> Result<()> {
     let in_path = &args[1];
     let config = load_config(in_path)?;
 
-    let ray_paths = core(&config);
+    let (ray_paths, pressure_field) = core(&config);
 
     // Derive output path: replace extension with .h5 (append if none)
     let out_path = {
@@ -40,26 +45,40 @@ fn main() -> Result<()> {
 
     // Write HDF5 output
     let out_path_str = out_path.to_str().expect("Invalid output path");
-    write_hdf5(out_path_str, &config, ray_paths)?;
+    write_hdf5(out_path_str, &config, ray_paths, pressure_field)?;
     Ok(())
 }
 
 
-fn core(cfg: &SimulationConfig) -> Vec<Vec<[f64; 3]>> {
+fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f64; 3]>>, PressureField) {
 
     // convert angles to radians
     let launch_elev_rad: Vec<f64> = cfg.source.launch_elev_deg.iter().map(|d| d.to_radians()).collect();    // "alpha" in Fortran
     let launch_azim_rad: Vec<f64> = cfg.source.launch_azim_deg.iter().map(|d| d.to_radians()).collect();    // "beta" in Fortran
+    let d_elev = if launch_elev_rad.len() >= 2 {
+        (launch_elev_rad[1] - launch_elev_rad[0]).abs()
+    } else {
+        1.0_f64.to_radians()
+    };
+    let d_azim = if launch_azim_rad.len() >= 2 {
+        (launch_azim_rad[1] - launch_azim_rad[0]).abs()
+    } else {
+        1.0_f64.to_radians()
+    };
 
-    // allocate pressure field array
-    let n_r_rcvr = cfg.receivers.ranges_m.as_ref().map_or(0, |v| v.len());
-    let n_bear_rcvr = cfg.receivers.bearings_deg.as_ref().map_or(0, |v| v.len());
-    let n_depths_rcvr = cfg.receivers.depths_m.as_ref().map_or(0, |v| v.len());
+    // allocate ray paths and pressure field
     let mut ray_paths = Vec::new();
-    let mut pressure_field_real = vec![0.0; n_r_rcvr * n_bear_rcvr * n_depths_rcvr];
 
+    // initialize environmental fields
     let ssp_field = init_ssp(cfg);
     let bty_field = bty::init_bty(cfg);
+
+    // allocate pressure field array
+    let mut pressure_field = init_pressure_field(cfg);
+
+    // angular frequency
+    let omega = 2.0 * std::f64::consts::PI * cfg.source.freq_hz;
+
 
     // loop over launch angles
     for &azim in &launch_azim_rad {
@@ -69,19 +88,17 @@ fn core(cfg: &SimulationConfig) -> Vec<Vec<[f64; 3]>> {
             let ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
 
             // beam influence
-
-            // accumulate pressure field
+            // gaussian_beam_influence(&mut ray_history.clone(), &mut pressure_field, elev, d_azim, d_elev, omega);
+            hat_beam_influence(&mut ray_history.clone(), &mut pressure_field, elev, d_azim, d_elev, omega);
 
             // save ray path history for output
             let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f64; 3]>>();
-            // println!("{}", ray_history.len());
-            // println!("{:?}", path);
             ray_paths.push(path);
-
-            // break;
         }
     }
-    return ray_paths;
+    // debug print
+    // println!("pressure field {}", pressure_field.pressure);
+    return (ray_paths, pressure_field);
         
 }
 

@@ -3,7 +3,9 @@ use crate::bty::{
     BTYfield,
     interpolate_bty,
 };
+
 use std::f64::consts::PI;
+use num_complex::Complex;
 
 pub fn surface_reflection(ray_history: &mut Vec<Ray>) {
     let ray = ray_history.last_mut().unwrap();
@@ -72,8 +74,44 @@ pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
         ray.position[1] += nudge * normal[1];
         ray.position[2] += nudge * normal[2];
 
-        ray.num_bottom_bounces += 1;
-        ray.phase += PI; // phase shift on reflection
+        // pressure release reflection
+        // ray.num_bottom_bounces += 1;
+        // ray.phase += PI; // phase shift on reflection
+
+        // Fresnel reflection coefficient for fluid-fluid interface
+        let u = {
+            let mag = (ray.direction[0]*ray.direction[0]
+            + ray.direction[1]*ray.direction[1]
+            + ray.direction[2]*ray.direction[2]).sqrt();
+            if mag > 0.0 {
+            [ray.direction[0]/mag, ray.direction[1]/mag, ray.direction[2]/mag]
+            } else {
+            [0.0, 0.0, 0.0]
+            }
+        };
+        let cos_th1 = (u[0]*normal[0] + u[1]*normal[1] + u[2]*normal[2]).abs();
+        let sin_th1 = (1.0_f64 - cos_th1 * cos_th1).max(0.0).sqrt();
+
+        let sin_th2 = (ray.c / bty_field.c) * sin_th1;
+        let rho_ocean = 1.0;
+
+        let refl_c = if sin_th2 > 1.0 {
+            // total internal reflection -> magnitude 1, zero imaginary part here
+            Complex::new(1.0_f64, 0.0_f64)
+        } else {
+            let cos_th2 = (1.0_f64 - sin_th2 * sin_th2).max(0.0).sqrt();
+            let z1 = rho_ocean * ray.c;
+            let z2 = bty_field.density * bty_field.c;
+            let re = (z2 * cos_th1 - z1 * cos_th2) / (z2 * cos_th1 + z1 * cos_th2);
+            Complex::new(re, 0.0_f64)
+        };
+
+
+        // update amplitude and phase
+        ray.amplitude *= refl_c.norm();
+        ray.phase += refl_c.arg();
+        // println!("Bottom reflection: refl_c = {}, new amp = {}, new phase = {}", refl_c, ray.amplitude, ray.phase);
+        
     }
 
 }

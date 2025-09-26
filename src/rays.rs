@@ -18,17 +18,18 @@ use crate::reflect::{
 pub struct Ray {
     pub position: [f64; 3],
     pub direction: [f64; 3],
-    c: f64,
-    phi: f64, // ray torsion 
+    pub phi: f64, // ray torsion 
     pub travel_time: f64,
-    amplitude: f64,
+    pub amplitude: f64,
     pub phase: f64,
     pub num_top_bounces: u32,
     pub num_bottom_bounces: u32,
-    p_tilde: [f64; 2], // paraxial vectors
-    q_tilde: [f64; 2],
-    p_hat: [f64; 2],
-    q_hat: [f64; 2],
+    pub p_tilde: [f64; 2], // paraxial vectors
+    pub q_tilde: [f64; 2],
+    pub p_hat: [f64; 2],
+    pub q_hat: [f64; 2],
+    pub det_q: f64,
+    pub c: f64, // local sound speed
 }
 
 
@@ -47,10 +48,10 @@ pub fn trace_ray(
 
     let c = interpolate_c(config.source.position, &ssp_field);
 
+
     let ray_init = Ray {
         position: config.source.position,
         direction: [ elev.cos() * azim.sin() / c, elev.cos() * azim.cos() / c, elev.sin()/ c],
-        c: c, 
         phi: 0.0,
         travel_time: 0.0,
         amplitude: 1.0,
@@ -61,6 +62,8 @@ pub fn trace_ray(
         q_tilde: [0.0, 0.0],
         p_hat: [0.0, 1.0],
         q_hat: [0.0, 0.0],
+        det_q: 0.0,
+        c: c,
     };
 
     let mut ray_history: Vec<Ray> = Vec::with_capacity(max_n_steps);
@@ -76,9 +79,10 @@ pub fn trace_ray(
         bottom_reflections(&mut ray_history, bty_field);
 
         // check for termination conditions
-        if check_max_range(&mut ray_history, config.beam.max_range_m) {
+        if check_max_range(&mut ray_history, config.beam.max_range_m, config.source.position) {
             break;
         }
+        
         
     }
 
@@ -97,6 +101,9 @@ fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f64, step: usize, ssp: &SSPFie
     let c0 = interpolate_c(ray0.position, ssp);
     let grad_c0 = interpolate_grad_c(ray0.position, ssp);
     let partial_c0 = interpolate_partials_c(ray0.position, ssp);
+
+    // update local sound speed
+    ray1.c = c0;
 
     // find ray normals
     let (e1, e2) = ray_normal(ray0.direction, ray0.phi, c0);
@@ -170,7 +177,7 @@ fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f64, step: usize, ssp: &SSPFie
 }
 
 
-fn ray_normal(direction: [f64; 3], phi: f64, c: f64) -> ([f64; 3], [f64; 3]) {
+pub fn ray_normal(direction: [f64; 3], phi: f64, c: f64) -> ([f64; 3], [f64; 3]) {
     // compute the ray normal vector e1, e2
 
     let mut e1 = [0.0; 3];
@@ -203,8 +210,10 @@ fn ray_normal(direction: [f64; 3], phi: f64, c: f64) -> ([f64; 3], [f64; 3]) {
 }
 
 
-fn check_max_range(ray_history: &mut Vec<Ray>, max_range: f64) -> bool {
+fn check_max_range(ray_history: &mut Vec<Ray>, max_range: f64, source_position: [f64; 3]) -> bool {
     let ray = ray_history.last().unwrap();
-    let range = (ray.position[0].powi(2) + ray.position[1].powi(2)).sqrt();
-    return range >= max_range;
+    let dx = ray.position[0] - source_position[0];
+    let dy = ray.position[1] - source_position[1];
+    let range = (dx.powi(2) + dy.powi(2)).sqrt();
+    range >= max_range
 }

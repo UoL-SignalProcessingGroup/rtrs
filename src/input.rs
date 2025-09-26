@@ -16,7 +16,7 @@ pub mod config {
         pub z_bty_m: Vec<f64>, // z (m, positive down)
         pub density_g_cm3: Vec<f64>, // bottom density (g/cm^3)
         pub c_bty_m_s: Vec<f64>, // bottom sound speed (m/s)
-        pub attenuation_db_per_wavelength: Vec<f64>, // bottom attenuation (dB/wavelength)
+        // pub attenuation_db_per_wavelength: Vec<f64>, // bottom attenuation (dB/wavelength)
     }
 
     #[derive(Debug, Deserialize)]
@@ -29,15 +29,9 @@ pub mod config {
 
     #[derive(Debug, Deserialize)]
     pub struct Receivers {
-        pub kind: String, // "clyindrical" or "cartesian"
-        // Cylindrical (r, theta, z) coordinates
-        pub ranges_m: Option<Vec<f64>>,
-        pub bearings_deg: Option<Vec<f64>>, // "theta" angles
-        pub depths_m: Option<Vec<f64>>,
-        // Cartesian (x, y, z) coordinates
-        pub x_rcvr_m: Option<Vec<f64>>,
-        pub y_rcvr_m: Option<Vec<f64>>,
-        pub z_rcvr_m: Option<Vec<f64>>,
+        pub x_rcvr_m: Vec<f64>,
+        pub y_rcvr_m: Vec<f64>,
+        pub z_rcvr_m: Vec<f64>,
     }
 
     #[derive(Debug, Deserialize)]
@@ -60,47 +54,11 @@ pub mod config {
 
 
 
-/*
+/* TODO:
 Example JSON template for SimulationConfig:
 
 {
-    "ssp": {
-        "interp_type": "tabulated",
-        "x_ssp_m": [0.0, 5000.0],
-        "y_ssp_m": [0.0, 5000.0],
-        "z_ssp_m": [0.0, 100.0],
-        // flattened 3D array: c_m_s[x][y][z] as a flat Vec<f64>
-        "c_m_s": [1500.0, 1520.0, 1510.0, 1530.0, 1490.0, 1510.0, 1500.0, 1520.0]
-    }
-    },
-    "bathymetry": {
-        "kind": "flat",
-        "flat_depth_m": 100.0,
-        "x_bty_m": null,
-        "y_bty_m": null,
-        "z_bty_m": null,
-        "density_g_cm3": [2.0],
-        "c_bty_m_s": [1600.0],
-        "attenuation_db_per_wavelength": [0.5]
-    },
-    "source": {
-        "position": [0.0, 0.0, 10.0],
-        "freq_hz": 1000.0,
-        "launch_elev_deg": [10.0, 20.0, 30.0],
-        "launch_azim_deg": [0.0, 90.0, 180.0]
-    },
-    "receivers": {
-        "kind": "cartesian",
-        "ranges_m": null,
-        "bearings_deg": null,
-        "depths_m": null,
-        "x_rcvr_m": [100.0, 200.0],
-        "y_rcvr_m": [0.0, 0.0],
-        "z_rcvr_m": [20.0, 30.0]
-    },
-    "beam": {
-        "step_m": 1.0,
-        "beam_type": "ray"
-    }
+
 }
+
 */

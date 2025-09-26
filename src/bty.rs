@@ -5,9 +5,9 @@ pub struct BTYfield {
     pub x: Vec<f64>,
     pub y: Vec<f64>,
     pub z: Array2<f64>,
-    density: f64,
-    c: f64,
-    alpha: f64, // attenuation (dB/wavelength)
+    pub density: f64,
+    pub c: f64,
+    // pub alpha: f64, // attenuation (dB/wavelength)
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
@@ -31,7 +31,7 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
         z: z_bty,
         density: confg.bathymetry.density_g_cm3[0], // for now, just use first value
         c: confg.bathymetry.c_bty_m_s[0], // for now, just use first value
-        alpha: confg.bathymetry.attenuation_db_per_wavelength[0], // for now, just use first value
+        // alpha: confg.bathymetry.attenuation_db_per_wavelength[0], // for now, just use first value
     };
 
     return bty_field;

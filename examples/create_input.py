@@ -22,13 +22,13 @@ def munk(Z, min_c=1500.0, epsilon=0.00737, min_z1=1300.0, min_z2=1300.0):
 # munk stuff
 z = np.linspace(0.0, 5000.0, 50)
 munk_ssp = munk(z)
-print("Munk SSP (1D):", munk_ssp)
+# print("Munk SSP (1D):", munk_ssp)
 # Tile munk_ssp into a 3D array of shape (2, 2, len(munk_ssp))
 munk_ssp_3d = np.tile(munk_ssp, (2, 2, 1))
-print("Munk SSP (3D):", munk_ssp_3d)
+# print("Munk SSP (3D):", munk_ssp_3d)
 # Flatten munk_ssp_3d to a 1D array in row-major order (C order)
 munk_ssp_3d_flat = munk_ssp_3d.flatten(order='C')
-print("Munk SSP (flattened 3D):", munk_ssp_3d_flat)
+# print("Munk SSP (flattened 3D):", munk_ssp_3d_flat)
 
 # perkeris
 z_pekeris = np.array([0.0, 100.0])
@@ -36,12 +36,12 @@ ssp_pekeris = np.array([1500.0, 1500.0])
 ssp_pekeris_3d = np.tile(ssp_pekeris, (2, 2, 1))
 ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 
-print(" SSP (1D):", ssp_pekeris)
-print(" SSP (3D):", ssp_pekeris_3d)
-print(" SSP (flattened 3D):", ssp_pekeris_3d_flat)
+# print(" SSP (1D):", ssp_pekeris)
+# print(" SSP (3D):", ssp_pekeris_3d)
+# print(" SSP (flattened 3D):", ssp_pekeris_3d_flat)
 
-rcvr_ranges = np.linspace(0.0, 5000.0, 500)
-alpha = np.linspace(-15.0, 15.0, 8)
+x_rcvr = np.linspace(0.0, 5000.0, 10)
+alpha = np.linspace(-10.0, 10.0, 50)
 
 
 
@@ -59,25 +59,21 @@ env_p = {
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
         "density_g_cm3": [1.6],
         "c_bty_m_s": [1700.0],
-        "attenuation_db_per_wavelength": [0.2]
+        # "attenuation_db_per_wavelength": [0.2]
     },
     "source": {
-        "position": [0.0, 0.0, 50.0],
+        "position": [0.0, 0.0, 20.0],
         "freq_hz": 1000.0,
-        "launch_elev_deg": list(alpha),
-        "launch_azim_deg": [0.0]
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 200).tolist(),
+        "launch_azim_deg": [-0.1, 0.0, 0.1]
     },
     "receivers": {
-        "kind": "cylindrical",
-        "ranges_m": list(rcvr_ranges),
-        "bearings_deg": [0.0],
-        "depths_m": [50.0],
-        "x_rcvr_m": None,
-        "y_rcvr_m": None,
-        "z_rcvr_m": None
+        "x_rcvr_m": [0.0],
+        "y_rcvr_m": np.linspace(0.0, 5000.0, 500).tolist(),
+        "z_rcvr_m": np.linspace(0.0, 100.0, 50).tolist()
     },
     "beam": {
-        "step_m": 1.0,
+        "step_m": 10.0,
         "max_steps": 10_000,
         "max_range_m": 10_000.0
     }
@@ -97,25 +93,21 @@ env_m = {
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
         "density_g_cm3": [1.6],
         "c_bty_m_s": [1700.0],
-        "attenuation_db_per_wavelength": [0.2]
+        # "attenuation_db_per_wavelength": [0.2]
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
-        "freq_hz": 1000.0,
-        "launch_elev_deg": list(alpha),
-        "launch_azim_deg": [0.0]
+        "freq_hz": 100.0,
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 4000).tolist(),
+        "launch_azim_deg": [-0.001, 0.0, 0.001]
     },
     "receivers": {
-        "kind": "cylindrical",
-        "ranges_m": list(rcvr_ranges),
-        "bearings_deg": [0.0],
-        "depths_m": [50.0],
-        "x_rcvr_m": None,
-        "y_rcvr_m": None,
-        "z_rcvr_m": None
+        "x_rcvr_m": [0.0],
+        "y_rcvr_m": np.linspace(0.0, 50000.0, 300).tolist(),
+        "z_rcvr_m": [1000.0]
     },
     "beam": {
-        "step_m": 1.0,
+        "step_m": 100.0,
         "max_steps": 100_000,
         "max_range_m": 50_000.0
     }
@@ -145,7 +137,7 @@ env_bty = {
         "z_bty_m": list(z_bty_flat),
         "density_g_cm3": [2.0],
         "c_bty_m_s": [1600.0],
-        "attenuation_db_per_wavelength": [0.5]
+        # "attenuation_db_per_wavelength": [0.5]
     },
     "source": {
         "position": [0.0, 25000.0, 50.0],
@@ -154,18 +146,14 @@ env_bty = {
         "launch_azim_deg": np.linspace(30.0, 150.0, 5).tolist()
     },
     "receivers": {
-        "kind": "cylindrical",
-        "ranges_m": list(rcvr_ranges),
-        "bearings_deg": [0.0],
-        "depths_m": [50.0],
-        "x_rcvr_m": None,
-        "y_rcvr_m": None,
-        "z_rcvr_m": None
+        "x_rcvr_m": [1000.0],
+        "y_rcvr_m": [1000.0],
+        "z_rcvr_m": [1000.0]
     },
     "beam": {
         "step_m": 1.0,
-        "max_steps": 10_000,
-        "max_range_m": 10_000.0
+        "max_steps": 1_000_000,
+        "max_range_m": 30_000.0
     }
 }
 
