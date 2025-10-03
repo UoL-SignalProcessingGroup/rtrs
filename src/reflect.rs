@@ -4,7 +4,7 @@ use crate::bty::{
     interpolate_bty,
 };
 
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 use num_complex::Complex;
 
 pub fn surface_reflection(ray_history: &mut Vec<Ray>) {
@@ -49,7 +49,7 @@ pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
             + normal[1] * (s[1] - ray.position[1])
             + normal[2] * (s[2] - ray.position[2]);
 
-        const EPS: f64 = 1e-12;
+        const EPS: f32 = 1e-12;
         if n_dot_d.abs() > EPS {
             let t_plane = n_dot_s_minus_p / n_dot_d;
             ray.position[0] += ray.direction[0] * t_plane;
@@ -90,20 +90,20 @@ pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
             }
         };
         let cos_th1 = (u[0]*normal[0] + u[1]*normal[1] + u[2]*normal[2]).abs();
-        let sin_th1 = (1.0_f64 - cos_th1 * cos_th1).max(0.0).sqrt();
+        let sin_th1 = (1.0_f32 - cos_th1 * cos_th1).max(0.0).sqrt();
 
         let sin_th2 = (ray.c / bty_field.c) * sin_th1;
         let rho_ocean = 1.0;
 
         let refl_c = if sin_th2 > 1.0 {
             // total internal reflection -> magnitude 1, zero imaginary part here
-            Complex::new(1.0_f64, 0.0_f64)
+            Complex::new(1.0_f32, 0.0_f32)
         } else {
-            let cos_th2 = (1.0_f64 - sin_th2 * sin_th2).max(0.0).sqrt();
+            let cos_th2 = (1.0_f32 - sin_th2 * sin_th2).max(0.0).sqrt();
             let z1 = rho_ocean * ray.c;
             let z2 = bty_field.density * bty_field.c;
             let re = (z2 * cos_th1 - z1 * cos_th2) / (z2 * cos_th1 + z1 * cos_th2);
-            Complex::new(re, 0.0_f64)
+            Complex::new(re, 0.0_f32)
         };
 
 
@@ -117,12 +117,12 @@ pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
 }
 
 fn calculate_bottom_normal_and_tangent(
-    position: [f64; 3],
+    position: [f32; 3],
     bty_field: &BTYfield,
-) -> ([f64; 3], [f64; 3]) {
+) -> ([f32; 3], [f32; 3]) {
 
     // Find indices for x and y consistent with bilinear interpolation used in bty.rs
-    let find_index = |arr: &[f64], val: f64| -> usize {
+    let find_index = |arr: &[f32], val: f32| -> usize {
         match arr.binary_search_by(|probe| probe.partial_cmp(&val).unwrap()) {
             Ok(i) => i.min(arr.len() - 2),
             Err(i) => i.saturating_sub(1).min(arr.len() - 2),

@@ -6,9 +6,9 @@ use ndarray::Array3;
 use crate::{input::config::SimulationConfig};
 use crate::influence::PressureField;
 
-// pressure_field: Array3<[f64; 2]> // alt option for (re, im)
+// pressure_field: Array3<[f32; 2]> // alt option for (re, im)
 
-pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_paths: Vec<Vec<[f64; 3]>>, pressure_field: PressureField) -> Result<()> {
+pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_paths: Vec<Vec<[f32; 3]>>, pressure_field: PressureField) -> Result<()> {
 
     // Create or overwrite HDF5 file
     let file = hdf5::File::create(file_path)?;
@@ -42,8 +42,8 @@ pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_pat
     // pressure_field.pressure is an ndarray::Array3<num_complex::Complex64>
     let shape = pressure_field.pressure.dim(); // (nx, ny, nz)
     // allocate vectors for real and imag parts in row-major order
-    let mut re_flat: Vec<f64> = Vec::with_capacity(shape.0 * shape.1 * shape.2);
-    let mut im_flat: Vec<f64> = Vec::with_capacity(shape.0 * shape.1 * shape.2);
+    let mut re_flat: Vec<f32> = Vec::with_capacity(shape.0 * shape.1 * shape.2);
+    let mut im_flat: Vec<f32> = Vec::with_capacity(shape.0 * shape.1 * shape.2);
     for ix in 0..shape.0 {
         for iy in 0..shape.1 {
             for iz in 0..shape.2 {
@@ -54,9 +54,9 @@ pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_pat
         }
     }
     // convert flattened data into ndarray 3D arrays with shape (nx, ny, nz)
-    let re_arr: Array3<f64> = Array3::from_shape_vec((shape.0, shape.1, shape.2), re_flat)
+    let re_arr: Array3<f32> = Array3::from_shape_vec((shape.0, shape.1, shape.2), re_flat)
         .expect("failed to reshape real pressure into 3D array");
-    let im_arr: Array3<f64> = Array3::from_shape_vec((shape.0, shape.1, shape.2), im_flat)
+    let im_arr: Array3<f32> = Array3::from_shape_vec((shape.0, shape.1, shape.2), im_flat)
         .expect("failed to reshape imag pressure into 3D array");
 
     pressure.new_dataset_builder().with_data(&re_arr).create("pressure_re")?;

@@ -7,17 +7,17 @@ use crate::utils::{
     cross_product,
 };
 
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 use ndarray::Array3;
-use num_complex::Complex64;
+use num_complex::Complex32;
 
 
 pub struct PressureField {
     // 3D pressure field array [x, y, z] with complex values
-    pub pressure: Array3<Complex64>,    // [x,y,z]
-    pub x_m: Vec<f64>,
-    pub y_m: Vec<f64>,
-    pub z_m: Vec<f64>,
+    pub pressure: Array3<Complex32>,    // [x,y,z]
+    pub x_m: Vec<f32>,
+    pub y_m: Vec<f32>,
+    pub z_m: Vec<f32>,
 }
 
 pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
@@ -27,7 +27,7 @@ pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
     let y_m = config.receivers.y_rcvr_m.clone();
     let z_m = config.receivers.z_rcvr_m.clone();
     let shape = (x_m.len(), y_m.len(), z_m.len());
-    let pressure = Array3::<Complex64>::zeros(shape);
+    let pressure = Array3::<Complex32>::zeros(shape);
 
     // init struct 
     PressureField {
@@ -38,7 +38,7 @@ pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
     }
 }
 
-fn scale_beam(elev: f64, d_elev: f64, d_azim: f64, ray: &mut [Ray]) {
+fn scale_beam(elev: f32, d_elev: f32, d_azim: f32, ray: &mut [Ray]) {
     let c0 = ray[0].c;
     let ratio1 = (elev.cos().abs().sqrt()) * (d_elev*d_azim).sqrt() / c0 / (2.0*PI);
     for r in ray.iter_mut() { r.amplitude *= ratio1 * r.c; }
@@ -59,10 +59,10 @@ fn scale_beam(elev: f64, d_elev: f64, d_azim: f64, ray: &mut [Ray]) {
 pub fn hat_beam_influence(
     ray_history: &mut Vec<Ray>, 
     pressure_field: &mut PressureField,
-    elev: f64,
-    d_azim: f64,
-    d_elev: f64,
-    omega: f64
+    elev: f32,
+    d_azim: f32,
+    d_elev: f32,
+    omega: f32
 ) {
     let n_steps = ray_history.len();
     if n_steps < 2 { return; }
@@ -208,7 +208,7 @@ pub fn hat_beam_influence(
 
                     // Apply coherent contribution
                     let phase = omega * delay - phase_int;
-                    let contribution = Complex64::new(
+                    let contribution = Complex32::new(
                         amp * phase.cos(),
                         amp * phase.sin()
                     );

@@ -50,20 +50,20 @@ fn main() -> Result<()> {
 }
 
 
-fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f64; 3]>>, PressureField) {
+fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
 
     // convert angles to radians
-    let launch_elev_rad: Vec<f64> = cfg.source.launch_elev_deg.iter().map(|d| d.to_radians()).collect();    // "alpha" in Fortran
-    let launch_azim_rad: Vec<f64> = cfg.source.launch_azim_deg.iter().map(|d| d.to_radians()).collect();    // "beta" in Fortran
+    let launch_elev_rad: Vec<f32> = cfg.source.launch_elev_deg.iter().map(|d| d.to_radians()).collect();    // "alpha" in Fortran
+    let launch_azim_rad: Vec<f32> = cfg.source.launch_azim_deg.iter().map(|d| d.to_radians()).collect();    // "beta" in Fortran
     let d_elev = if launch_elev_rad.len() >= 2 {
         (launch_elev_rad[1] - launch_elev_rad[0]).abs()
     } else {
-        1.0_f64.to_radians()
+        1.0_f32.to_radians()
     };
     let d_azim = if launch_azim_rad.len() >= 2 {
         (launch_azim_rad[1] - launch_azim_rad[0]).abs()
     } else {
-        1.0_f64.to_radians()
+        1.0_f32.to_radians()
     };
 
     // allocate ray paths and pressure field
@@ -77,7 +77,7 @@ fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f64; 3]>>, PressureField) {
     let mut pressure_field = init_pressure_field(cfg);
 
     // angular frequency
-    let omega = 2.0 * std::f64::consts::PI * cfg.source.freq_hz;
+    let omega = 2.0 * std::f32::consts::PI * cfg.source.freq_hz;
 
 
     // loop over launch angles
@@ -92,7 +92,7 @@ fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f64; 3]>>, PressureField) {
             hat_beam_influence(&mut ray_history.clone(), &mut pressure_field, elev, d_azim, d_elev, omega);
 
             // save ray path history for output
-            let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f64; 3]>>();
+            let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f32; 3]>>();
             ray_paths.push(path);
         }
     }

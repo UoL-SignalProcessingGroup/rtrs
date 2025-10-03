@@ -2,19 +2,19 @@ use crate::input::config::SimulationConfig;
 use ndarray::Array3;
 
 pub struct SSPFields {
-    x: Vec<f64>,
-    y: Vec<f64>,
-    z: Vec<f64>,
-    c: Array3<f64>,
-    cx: Array3<f64>,
-    cy: Array3<f64>,
-    cz: Array3<f64>,
-    cxx: Array3<f64>,
-    cyy: Array3<f64>,
-    czz: Array3<f64>,
-    cxy: Array3<f64>,
-    cxz: Array3<f64>,
-    cyz: Array3<f64>,
+    x: Vec<f32>,
+    y: Vec<f32>,
+    z: Vec<f32>,
+    c: Array3<f32>,
+    cx: Array3<f32>,
+    cy: Array3<f32>,
+    cz: Array3<f32>,
+    cxx: Array3<f32>,
+    cyy: Array3<f32>,
+    czz: Array3<f32>,
+    cxy: Array3<f32>,
+    cxz: Array3<f32>,
+    cyz: Array3<f32>,
 }
 
 pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
@@ -79,12 +79,12 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
 }
 
 
-pub fn interpolate_c(position: [f64; 3], ssp: &SSPFields) -> f64 {
+pub fn interpolate_c(position: [f32; 3], ssp: &SSPFields) -> f32 {
     let c = trilinear_interpolation(position, &ssp.c, &ssp.x, &ssp.y, &ssp.z);
     return c;
 }
 
-pub fn interpolate_grad_c(position: [f64; 3], ssp: &SSPFields) -> [f64; 3] {
+pub fn interpolate_grad_c(position: [f32; 3], ssp: &SSPFields) -> [f32; 3] {
     // interpolate grad c at position
     let cx = trilinear_interpolation(position, &ssp.cx, &ssp.x, &ssp.y, &ssp.z);
     let cy = trilinear_interpolation(position, &ssp.cy, &ssp.x, &ssp.y, &ssp.z);
@@ -92,7 +92,7 @@ pub fn interpolate_grad_c(position: [f64; 3], ssp: &SSPFields) -> [f64; 3] {
     return [cx, cy, cz];
 }
 
-pub fn interpolate_partials_c(position: [f64; 3], ssp: &SSPFields) -> [f64; 6] {
+pub fn interpolate_partials_c(position: [f32; 3], ssp: &SSPFields) -> [f32; 6] {
     // interpolate cxx, cyy, czz, cxy, cxz, cyz at position
     let cxx = trilinear_interpolation(position, &ssp.cxx, &ssp.x, &ssp.y, &ssp.z);
     let cyy = trilinear_interpolation(position, &ssp.cyy, &ssp.x, &ssp.y, &ssp.z);
@@ -104,7 +104,7 @@ pub fn interpolate_partials_c(position: [f64; 3], ssp: &SSPFields) -> [f64; 6] {
 }
 
 pub fn calculate_ray_partials_c(
-    cxx: f64, cxy: f64, cxz: f64, cyy: f64, cyz: f64, czz: f64, e1: [f64; 3], e2: [f64; 3]) -> [f64; 3] {
+    cxx: f32, cxy: f32, cxz: f32, cyy: f32, cyz: f32, czz: f32, e1: [f32; 3], e2: [f32; 3]) -> [f32; 3] {
     // calculate cnn cmn cmm curvature of sound speed (ray-centered)
     let cnn = cxx * e1[0].powi(2) + cyy * e1[1].powi(2) + czz * e1[2].powi(2)
         + 2.0 * cxy * e1[0] * e1[1]
@@ -126,10 +126,10 @@ pub fn calculate_ray_partials_c(
 }
 
 
-fn partial_x(c: &Array3<f64>, dx: f64) -> Array3<f64> {
+fn partial_x(c: &Array3<f32>, dx: f32) -> Array3<f32> {
     let (nx, ny, nz) = c.dim();
     assert!(nx >= 2, "Need nx >= 2 for finite differences along x");
-    let mut d = Array3::<f64>::zeros((nx, ny, nz));
+    let mut d = Array3::<f32>::zeros((nx, ny, nz));
 
     // i = 0 (forward)
     for j in 0..ny {
@@ -157,10 +157,10 @@ fn partial_x(c: &Array3<f64>, dx: f64) -> Array3<f64> {
     d
 }
 
-fn partial_y(c: &Array3<f64>, dy: f64) -> Array3<f64> {
+fn partial_y(c: &Array3<f32>, dy: f32) -> Array3<f32> {
     let (nx, ny, nz) = c.dim();
     assert!(ny >= 2, "Need ny >= 2 for finite differences along y");
-    let mut d = Array3::<f64>::zeros((nx, ny, nz));
+    let mut d = Array3::<f32>::zeros((nx, ny, nz));
 
     // j = 0 (forward)
     for i in 0..nx {
@@ -188,10 +188,10 @@ fn partial_y(c: &Array3<f64>, dy: f64) -> Array3<f64> {
     d
 }
 
-fn partial_z(c: &Array3<f64>, dz: f64) -> Array3<f64> {
+fn partial_z(c: &Array3<f32>, dz: f32) -> Array3<f32> {
     let (nx, ny, nz) = c.dim();
     assert!(nz >= 2, "Need nz >= 2 for finite differences along z");
-    let mut d = Array3::<f64>::zeros((nx, ny, nz));
+    let mut d = Array3::<f32>::zeros((nx, ny, nz));
 
     // k = 0 (forward)
     for i in 0..nx {
@@ -221,17 +221,17 @@ fn partial_z(c: &Array3<f64>, dz: f64) -> Array3<f64> {
 
 
 fn trilinear_interpolation(
-    position: [f64; 3], 
-    field: &Array3<f64>, 
-    x: &[f64], 
-    y: &[f64], 
-    z: &[f64]
-) -> f64 {
+    position: [f32; 3], 
+    field: &Array3<f32>, 
+    x: &[f32], 
+    y: &[f32], 
+    z: &[f32]
+) -> f32 {
     // Trilinear interpolation of field at position [x, y, z]
 
     // Find indices function  i, j, k such that x[i] <= position[0] < x[i+1], etc.
     // use binary search as x,y,z arrays are sorted
-    let find_index = |arr: &[f64], val: f64| -> usize {
+    let find_index = |arr: &[f32], val: f32| -> usize {
         match arr.binary_search_by(|probe| probe.partial_cmp(&val).unwrap()) {
             Ok(i) => i.min(arr.len() - 2), // exact match
             Err(i) => i.saturating_sub(1).min(arr.len() - 2), // interval before insert position

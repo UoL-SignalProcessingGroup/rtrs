@@ -16,26 +16,26 @@ use crate::reflect::{
 
 #[derive(Clone)]
 pub struct Ray {
-    pub position: [f64; 3],
-    pub direction: [f64; 3],
-    pub phi: f64, // ray torsion 
-    pub travel_time: f64,
-    pub amplitude: f64,
-    pub phase: f64,
+    pub position: [f32; 3],
+    pub direction: [f32; 3],
+    pub phi: f32, // ray torsion 
+    pub travel_time: f32,
+    pub amplitude: f32,
+    pub phase: f32,
     pub num_top_bounces: u32,
     pub num_bottom_bounces: u32,
-    pub p_tilde: [f64; 2], // paraxial vectors
-    pub q_tilde: [f64; 2],
-    pub p_hat: [f64; 2],
-    pub q_hat: [f64; 2],
-    pub det_q: f64,
-    pub c: f64, // local sound speed
+    pub p_tilde: [f32; 2], // paraxial vectors
+    pub q_tilde: [f32; 2],
+    pub p_hat: [f32; 2],
+    pub q_hat: [f32; 2],
+    pub det_q: f32,
+    pub c: f32, // local sound speed
 }
 
 
 pub fn trace_ray(
-    azim: f64, 
-    elev: f64, 
+    azim: f32, 
+    elev: f32, 
     config: &SimulationConfig, 
     ssp_field: &SSPFields,
     bty_field: &bty::BTYfield
@@ -90,7 +90,7 @@ pub fn trace_ray(
 }
 
 
-fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f64, step: usize, ssp: &SSPFields) {
+fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f32, step: usize, ssp: &SSPFields) {
     // Euler Method
 
     // allocate ray states for step
@@ -177,7 +177,7 @@ fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f64, step: usize, ssp: &SSPFie
 }
 
 
-pub fn ray_normal(direction: [f64; 3], phi: f64, c: f64) -> ([f64; 3], [f64; 3]) {
+pub fn ray_normal(direction: [f32; 3], phi: f32, c: f32) -> ([f32; 3], [f32; 3]) {
     // compute the ray normal vector e1, e2
 
     let mut e1 = [0.0; 3];
@@ -210,7 +210,7 @@ pub fn ray_normal(direction: [f64; 3], phi: f64, c: f64) -> ([f64; 3], [f64; 3])
 }
 
 
-fn check_max_range(ray_history: &mut Vec<Ray>, max_range: f64, source_position: [f64; 3]) -> bool {
+fn check_max_range(ray_history: &mut Vec<Ray>, max_range: f32, source_position: [f32; 3]) -> bool {
     let ray = ray_history.last().unwrap();
     let dx = ray.position[0] - source_position[0];
     let dy = ray.position[1] - source_position[1];

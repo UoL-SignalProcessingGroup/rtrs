@@ -2,12 +2,12 @@ use crate::input::config::SimulationConfig;
 use ndarray::Array2;
 
 pub struct BTYfield {
-    pub x: Vec<f64>,
-    pub y: Vec<f64>,
-    pub z: Array2<f64>,
-    pub density: f64,
-    pub c: f64,
-    // pub alpha: f64, // attenuation (dB/wavelength)
+    pub x: Vec<f32>,
+    pub y: Vec<f32>,
+    pub z: Array2<f32>,
+    pub density: f32,
+    pub c: f32,
+    // pub alpha: f32, // attenuation (dB/wavelength)
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
@@ -38,19 +38,19 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
 
 }
 
-pub fn interpolate_bty(position: [f64; 3], bty_field: &BTYfield) -> f64 {
+pub fn interpolate_bty(position: [f32; 3], bty_field: &BTYfield) -> f32 {
     // Bilinear interpolation of bottom depth at (x,y)
     bilinear_interpolation(position, &bty_field.z, &bty_field.x, &bty_field.y)
 }
 
 fn bilinear_interpolation(
-    position: [f64; 3],
-    field: &Array2<f64>,
-    x: &[f64],
-    y: &[f64],
-) -> f64 {
+    position: [f32; 3],
+    field: &Array2<f32>,
+    x: &[f32],
+    y: &[f32],
+) -> f32 {
     // Find index function: i, j such that x[i] <= position[0] < x[i+1], etc.
-    let find_index = |arr: &[f64], val: f64| -> usize {
+    let find_index = |arr: &[f32], val: f32| -> usize {
         match arr.binary_search_by(|probe| probe.partial_cmp(&val).unwrap()) {
             Ok(i) => i.min(arr.len() - 2), // exact match
             Err(i) => i.saturating_sub(1).min(arr.len() - 2), // interval before insert position

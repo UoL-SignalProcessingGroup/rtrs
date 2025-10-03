@@ -173,7 +173,7 @@ def main():
     plot_rays_yz(rays)
     # plot_rays_xy(rays)
     # plot_rays_3d(rays)
-    # plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
+    plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
     # plot_line_tl_x(tl, x_m, y_m, z_m, y_idx=len(y_m)//2, z_idx=len(z_m)//2)
     plot_line_tl_y(tl, x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=len(z_m)//2)
     # plot_line_tl_z(tl, x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
