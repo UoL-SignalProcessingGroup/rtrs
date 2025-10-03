@@ -7,7 +7,7 @@ pub struct BTYfield {
     pub z: Array2<f32>,
     pub density: f32,
     pub c: f32,
-    // pub alpha: f32, // attenuation (dB/wavelength)
+    pub atten: f32, // attenuation (nepers per meter for pressure amplitude)
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
@@ -25,13 +25,21 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
             confg.bathymetry.z_bty_m.len()
         ));
 
+    // Convert attenuation from dB (assumed dB per meter) to nepers per meter for
+    // pressure amplitude. 1 Np = 8.685889638065036 dB, and dB attenuation is
+    // typically quoted for intensity (power) in dB; if the input is already dB
+    // re: amplitude, the conversion differs by factor 20 vs 10. Here we assume
+    // `attenuation_db` is dB per meter for intensity (common), so convert to
+    // amplitude nepers/m by: nepers = (atten_dB / 20) * ln(10) = atten_dB * ln(10)/20.
+    // If attenuation_db is amplitude dB, remove the /20. This choice is noted.
+
     let bty_field = BTYfield {
         x: confg.bathymetry.x_bty_m.clone(),
         y: confg.bathymetry.y_bty_m.clone(),
         z: z_bty,
-        density: confg.bathymetry.density_g_cm3[0], // for now, just use first value
-        c: confg.bathymetry.c_bty_m_s[0], // for now, just use first value
-        // alpha: confg.bathymetry.attenuation_db_per_wavelength[0], // for now, just use first value
+        density: confg.bathymetry.density_g_cm3, 
+        c: confg.bathymetry.c_bty_m_s, 
+        atten: confg.bathymetry.attenuation_db * std::f32::consts::LN_10 / 20.0,
     };
 
     return bty_field;

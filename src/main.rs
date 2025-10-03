@@ -14,8 +14,12 @@ use input::config::SimulationConfig;
 use output::write_hdf5;
 use rays::trace_ray;
 use ssp::init_ssp;
-// use influence::{gaussian_beam_influence, init_pressure_field, PressureField};
-use influence::{hat_beam_influence, init_pressure_field, PressureField};
+use influence::{
+    hat_beam_influence,
+    gaussian_beam_influence, 
+    init_pressure_field, 
+    PressureField
+};
 
 fn load_config(path: &str) -> Result<SimulationConfig> {
     let text = fs::read_to_string(path)?;
@@ -67,7 +71,7 @@ fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
     };
 
     // allocate ray paths and pressure field
-    let mut ray_paths = Vec::new();
+    let mut ray_paths = Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len());
 
     // initialize environmental fields
     let ssp_field = init_ssp(cfg);
@@ -85,11 +89,11 @@ fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
         for &elev in &launch_elev_rad {
             
             // trace rays
-            let ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
+            let mut ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
 
             // beam influence
-            // gaussian_beam_influence(&mut ray_history.clone(), &mut pressure_field, elev, d_azim, d_elev, omega);
-            hat_beam_influence(&mut ray_history.clone(), &mut pressure_field, elev, d_azim, d_elev, omega);
+            gaussian_beam_influence(&mut ray_history, &mut pressure_field, elev, d_azim, d_elev, omega);
+            // hat_beam_influence(&mut ray_history, &mut pressure_field, elev, d_azim, d_elev, omega);
 
             // save ray path history for output
             let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f32; 3]>>();

@@ -159,7 +159,7 @@ def plot_tl_yz(tl, x_m, y_m, z_m, x_idx):
     plt.tight_layout()
 
 def main():
-    h5file = "examples/testp.h5"
+    h5file = "examples/testm.h5"
     rays = load_rays(h5file)
     x_bty, y_bty, z_bty = load_bty(h5file)
     x_m, y_m, z_m, pressure = load_cmpx_pressure(h5file)
@@ -169,8 +169,8 @@ def main():
     print(tl)
     
 
-    # plot_rays_xz(rays)
-    plot_rays_yz(rays)
+    plot_rays_xz(rays)
+    # plot_rays_yz(rays)
     # plot_rays_xy(rays)
     # plot_rays_3d(rays)
     plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)

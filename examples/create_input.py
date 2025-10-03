@@ -57,9 +57,9 @@ env_p = {
         "x_bty_m": [0.0, 5000.0],
         "y_bty_m": [0.0, 5000.0],
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": [1.6],
-        "c_bty_m_s": [1700.0],
-        # "attenuation_db_per_wavelength": [0.2]
+        "density_g_cm3": 1.6,
+        "c_bty_m_s": 1700.0,
+        "attenuation_db": 10.2
     },
     "source": {
         "position": [0.0, 0.0, 20.0],
@@ -91,9 +91,9 @@ env_m = {
         "x_bty_m": [0.0, 50000.0],
         "y_bty_m": [0.0, 50000.0],
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": [1.6],
-        "c_bty_m_s": [1700.0],
-        # "attenuation_db_per_wavelength": [0.2]
+        "density_g_cm3": 1.6,
+        "c_bty_m_s": 1700.0,
+        "attenuation_db": 0.2
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
@@ -135,9 +135,9 @@ env_bty = {
         "x_bty_m": list(x_bty),
         "y_bty_m": list(y_bty),
         "z_bty_m": list(z_bty_flat),
-        "density_g_cm3": [2.0],
-        "c_bty_m_s": [1600.0],
-        # "attenuation_db_per_wavelength": [0.5]
+        "density_g_cm3": 2.0,
+        "c_bty_m_s": 1600.0,
+        "attenuation_db": 0.5
     },
     "source": {
         "position": [0.0, 25000.0, 50.0],

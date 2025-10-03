@@ -14,9 +14,9 @@ pub mod config {
         pub x_bty_m: Vec<f32>, // x (m)
         pub y_bty_m: Vec<f32>, // y (m)
         pub z_bty_m: Vec<f32>, // z (m, positive down)
-        pub density_g_cm3: Vec<f32>, // bottom density (g/cm^3)
-        pub c_bty_m_s: Vec<f32>, // bottom sound speed (m/s)
-        // pub attenuation_db_per_wavelength: Vec<f32>, // bottom attenuation (dB/wavelength)
+        pub density_g_cm3: f32, // bottom density (g/cm^3)
+        pub c_bty_m_s: f32, // bottom sound speed (m/s)
+        pub attenuation_db: f32, // bottom attenuation (dB/meter)
     }
 
     #[derive(Debug, Deserialize)]
