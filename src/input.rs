@@ -22,7 +22,7 @@ pub mod config {
     #[derive(Debug, Deserialize)]
     pub struct Source {
         pub position: [f32; 3], // x, y, z (m)
-        pub freq_hz: f32,
+        pub freq_hz: Vec<f32>,
         pub launch_elev_deg: Vec<f32>, // "alpha" angles
         pub launch_azim_deg: Vec<f32>,  // "beta" angles
     }

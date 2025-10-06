@@ -34,12 +34,13 @@ def load_bty(h5path):
 def load_cmpx_pressure(h5path):
     with h5py.File(h5path, 'r') as f:
         pressure_field = f['pressure_field']
+        frequency_hz = pressure_field['frequency_hz'][:]
         x_m = pressure_field['x_m'][:]
         y_m = pressure_field['y_m'][:]
         z_m = pressure_field['z_m'][:]
         pressure_im = pressure_field['pressure_im'][:]
         pressure_re = pressure_field['pressure_re'][:]
-    return x_m, y_m, z_m, pressure_re + 1j * pressure_im
+    return frequency_hz, x_m, y_m, z_m, pressure_re + 1j * pressure_im
 
 
 def plot_rays_3d(rays):
@@ -158,26 +159,37 @@ def plot_tl_yz(tl, x_m, y_m, z_m, x_idx):
     plt.gca().invert_yaxis()
     plt.tight_layout()
 
+def plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx, y_idx, z_idx):
+    plt.figure()
+    plt.plot(freq, pressure[:, x_idx, y_idx, z_idx])
+    plt.xlabel('Frequency Index')
+    plt.ylabel('Pressure Amplitude')
+    plt.title(f'Pressure Amplitude at x={x_m[x_idx]:.1f} m, y={y_m[y_idx]:.1f} m, z={z_m[z_idx]:.1f} m')
+    plt.grid()
+    plt.tight_layout()
+
 def main():
     h5file = "examples/testm.h5"
     rays = load_rays(h5file)
+    print(len(rays[0]), "number of steps in first ray")
     x_bty, y_bty, z_bty = load_bty(h5file)
-    x_m, y_m, z_m, pressure = load_cmpx_pressure(h5file)
-    pressure = np.reshape(pressure, (len(x_m), len(y_m), len(z_m)))
+    freq, x_m, y_m, z_m, pressure = load_cmpx_pressure(h5file)
+    pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
     print(pressure.shape)
     tl = - 20 * np.log10(np.abs(pressure))
     print(tl)
     
 
-    plot_rays_xz(rays)
+    # plot_rays_xz(rays)
     # plot_rays_yz(rays)
     # plot_rays_xy(rays)
     # plot_rays_3d(rays)
-    plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
-    # plot_line_tl_x(tl, x_m, y_m, z_m, y_idx=len(y_m)//2, z_idx=len(z_m)//2)
-    plot_line_tl_y(tl, x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=len(z_m)//2)
-    # plot_line_tl_z(tl, x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
-    plot_tl_yz(tl, x_m, y_m, z_m, x_idx=len(x_m)//2)
+    # plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
+    plot_line_tl_x(tl[0,:,:,:], x_m, y_m, z_m, y_idx=len(y_m)//2, z_idx=len(z_m)//2)
+    plot_line_tl_y(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=len(z_m)//2)
+    plot_line_tl_z(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
+    plot_tl_yz(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2)
+    plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=0, y_idx=0, z_idx=0)
     plt.show()  
     
 

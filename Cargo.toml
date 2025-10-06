@@ -3,6 +3,12 @@ name = "rtrs"
 version = "0.1.0"
 edition = "2024"
 
+# [profile.release]
+# lto = "fat"        # "thin" or "fat" 
+# codegen-units = 1   # best throughput; slower compile
+# opt-level = 3       # or "z"/"s" for size-first
+# incremental = false 
+
 [dependencies]
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

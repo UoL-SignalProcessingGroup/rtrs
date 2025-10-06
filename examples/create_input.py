@@ -19,6 +19,73 @@ def munk(Z, min_c=1500.0, epsilon=0.00737, min_z1=1300.0, min_z2=1300.0):
     return c
 
 
+def linear_towed_array(center, heading_deg, length_m=None, n_elements=None, spacing_m=None, depth_m=50.0):
+    """
+    Generate receiver coordinates for a linear horizontal towed array.
+
+    Parameters
+    - center: (x, y, z) center position of the array (meters). z is ignored for horizontal placement
+    - heading_deg: float, array heading in degrees clockwise from +x (East) (same convention as typical navigation)
+    - length_m: total physical length of the array in meters (optional if spacing_m and n_elements provided)
+    - n_elements: integer number of hydrophones/elements along the array (required unless length_m+spacing or spacing+makes sense)
+    - spacing_m: spacing between adjacent elements in meters (optional)
+    - depth_m: depth of array (positive value, meters)
+
+    Returns
+    - x_list, y_list, z_list: plain Python lists suitable for JSON serialization (meters)
+
+    Notes
+    - If n_elements and spacing_m are provided, length_m is derived as (n_elements-1)*spacing_m.
+    - If length_m and n_elements are provided, spacing_m = length_m/(n_elements-1).
+    - Heading 0 deg => array aligned along +x; 90 deg => along +y.
+    """
+    import math
+
+    # Validate inputs and infer missing values
+    if n_elements is None and spacing_m is None:
+        raise ValueError("Either n_elements or spacing_m (or both with length_m) must be provided")
+
+    if n_elements is not None and n_elements < 1:
+        raise ValueError("n_elements must be >= 1")
+
+    if n_elements is None:
+        # derive n_elements from length and spacing
+        if length_m is None:
+            raise ValueError("When n_elements not given, length_m must be provided along with spacing_m")
+        n_elements = int(math.floor(length_m / spacing_m)) + 1
+
+    if spacing_m is None:
+        if length_m is None:
+            raise ValueError("When spacing_m not given, length_m and n_elements must be provided")
+        if n_elements == 1:
+            spacing_m = 0.0
+        else:
+            spacing_m = length_m / (n_elements - 1)
+
+    # Compute element positions along a line centered on the center point
+    # Parametric positions along the array from -half_len to +half_len
+    half_len = spacing_m * (n_elements - 1) / 2.0
+    offsets = [(-half_len + i * spacing_m) for i in range(n_elements)]
+
+    # Convert heading to radians; heading is clockwise from +x so convert to math angle (counter-clockwise)
+    # math_angle = -heading_deg
+    theta = math.radians(heading_deg)
+
+    cx, cy, cz = center
+    x_list = []
+    y_list = []
+    z_list = []
+    for s in offsets:
+        # Position offset in global coords: dx = s*cos(theta), dy = s*sin(theta)
+        dx = s * math.cos(theta)
+        dy = s * math.sin(theta)
+        x_list.append(cx + dx)
+        y_list.append(cy + dy)
+        # z: place at specified depth relative to sea surface (positive down)
+        z_list.append(depth_m)
+
+    return list(map(float, x_list)), list(map(float, y_list)), list(map(float, z_list))
+
 # munk stuff
 z = np.linspace(0.0, 5000.0, 50)
 munk_ssp = munk(z)
@@ -40,40 +107,35 @@ ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 # print(" SSP (3D):", ssp_pekeris_3d)
 # print(" SSP (flattened 3D):", ssp_pekeris_3d_flat)
 
-x_rcvr = np.linspace(0.0, 5000.0, 10)
-alpha = np.linspace(-10.0, 10.0, 50)
-
-
-
 env_p = {
     "ssp": {
-        "interp_type": "tabulated",
-        "x_ssp_m": [0.0, 5000.0],
-        "y_ssp_m": [0.0, 5000.0],
+        
+        "x_ssp_m": [0.0, 10000.0],
+        "y_ssp_m": [0.0, 10000.0],
         "z_ssp_m": [0.0, 100.0],
         "c_m_s": list(ssp_pekeris_3d_flat)
     },
     "bathymetry": {
-        "x_bty_m": [0.0, 5000.0],
-        "y_bty_m": [0.0, 5000.0],
+        "x_bty_m": [0.0, 10000.0],
+        "y_bty_m": [0.0, 10000.0],
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
         "density_g_cm3": 1.6,
         "c_bty_m_s": 1700.0,
-        "attenuation_db": 10.2
+        "attenuation_db": 0.5
     },
     "source": {
-        "position": [0.0, 0.0, 20.0],
-        "freq_hz": 1000.0,
+        "position": [0.0, 0.0, 25.0],
+        "freq_hz": [1000.0],
         "launch_elev_deg": np.linspace(-10.0, 10.0, 200).tolist(),
         "launch_azim_deg": [-0.1, 0.0, 0.1]
     },
     "receivers": {
         "x_rcvr_m": [0.0],
-        "y_rcvr_m": np.linspace(0.0, 5000.0, 500).tolist(),
-        "z_rcvr_m": np.linspace(0.0, 100.0, 50).tolist()
+        "y_rcvr_m": np.linspace(0.0, 10000.0, 500).tolist(),
+        "z_rcvr_m": np.linspace(0.0, 100.0, 100).tolist()
     },
     "beam": {
-        "step_m": 10.0,
+        "step_m": 15.0,
         "max_steps": 10_000,
         "max_range_m": 10_000.0
     }
@@ -81,7 +143,7 @@ env_p = {
 
 env_m = {
     "ssp": {
-        "interp_type": "tabulated",
+        
         "x_ssp_m": [0.0, 5000.0],
         "y_ssp_m": [0.0, 5000.0],
         "z_ssp_m": list(z),
@@ -93,18 +155,19 @@ env_m = {
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
         "density_g_cm3": 1.6,
         "c_bty_m_s": 1700.0,
-        "attenuation_db": 0.2
+        "attenuation_db": 1.0
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
-        "freq_hz": 100.0,
-        "launch_elev_deg": np.linspace(-10.0, 10.0, 4000).tolist(),
+        # "freq_hz": [1000.0],
+        "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-25.0, 25.0, 4000).tolist(),
         "launch_azim_deg": [-0.001, 0.0, 0.001]
     },
     "receivers": {
         "x_rcvr_m": [0.0],
-        "y_rcvr_m": np.linspace(0.0, 50000.0, 300).tolist(),
-        "z_rcvr_m": [1000.0]
+        "y_rcvr_m": np.linspace(0.0, 50000.0, 2000).tolist(),
+        "z_rcvr_m": [1000.0] # np.linspace(0.0, 5000.0, 500).tolist()
     },
     "beam": {
         "step_m": 100.0,
@@ -123,7 +186,6 @@ z_bty_flat = z_bty.flatten(order='C')
 
 env_bty = {
     "ssp": {
-        "interp_type": "tabulated",
         "x_ssp_m": [0.0, 5000.0],
         "y_ssp_m": [0.0, 5000.0],
         "z_ssp_m": [0.0, 100.0],
@@ -141,8 +203,8 @@ env_bty = {
     },
     "source": {
         "position": [0.0, 25000.0, 50.0],
-        "freq_hz": 1000.0,
-        "launch_elev_deg": np.linspace(-50.0, 50.0, 1).tolist(),
+        "freq_hz": [1000.0],
+        "launch_elev_deg": np.linspace(-25.0, 25.0, 1).tolist(),
         "launch_azim_deg": np.linspace(30.0, 150.0, 5).tolist()
     },
     "receivers": {
@@ -151,9 +213,114 @@ env_bty = {
         "z_rcvr_m": [1000.0]
     },
     "beam": {
-        "step_m": 1.0,
+        "step_m": 25.0,
         "max_steps": 1_000_000,
         "max_range_m": 30_000.0
+    }
+}
+
+x,y,z = linear_towed_array(center=(0.0, 5000.0, 50.0), heading_deg=45.0, length_m=100.0, n_elements=11, depth_m=50.0)
+print()
+print(x)
+print(y)
+print(z)
+
+env_lha = {
+    "ssp": {
+        "x_ssp_m": [0.0, 10000.0],
+        "y_ssp_m": [0.0, 10000.0],
+        "z_ssp_m": [0.0, 100.0],
+        "c_m_s": list(ssp_pekeris_3d_flat)
+    },
+    "bathymetry": {
+        "x_bty_m": [0.0, 10000.0],
+        "y_bty_m": [0.0, 10000.0],
+        "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
+        "density_g_cm3": 1.6,
+        "c_bty_m_s": 1700.0,
+        "attenuation_db": 0.5
+    },
+    "source": {
+        "position": [0.0, 0.0, 25.0],
+        "freq_hz": [1000.0],
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 200).tolist(),
+        "launch_azim_deg": [-0.1, 0.0, 0.1]
+    },
+    "receivers": {
+        "x_rcvr_m": x,
+        "y_rcvr_m": y,
+        "z_rcvr_m": z
+    },
+    "beam": {
+        "step_m": 15.0,
+        "max_steps": 10_000,
+        "max_range_m": 10_000.0
+    }
+}
+
+env_lha = {
+    "ssp": {
+        "x_ssp_m": [0.0, 10000.0],
+        "y_ssp_m": [0.0, 10000.0],
+        "z_ssp_m": [0.0, 100.0],
+        "c_m_s": list(ssp_pekeris_3d_flat)
+    },
+    "bathymetry": {
+        "x_bty_m": [0.0, 10000.0],
+        "y_bty_m": [0.0, 10000.0],
+        "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
+        "density_g_cm3": 1.6,
+        "c_bty_m_s": 1700.0,
+        "attenuation_db": 0.5
+    },
+    "source": {
+        "position": [0.0, 0.0, 25.0],
+        "freq_hz": [1000.0],
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 200).tolist(),
+        "launch_azim_deg": [-0.1, 0.0, 0.1]
+    },
+    "receivers": {
+        "x_rcvr_m": x,
+        "y_rcvr_m": y,
+        "z_rcvr_m": z
+    },
+    "beam": {
+        "step_m": 15.0,
+        "max_steps": 10_000,
+        "max_range_m": 10_000.0
+    }
+}
+
+env_bb = {
+    "ssp": {
+        "x_ssp_m": [0.0, 10000.0],
+        "y_ssp_m": [0.0, 10000.0],
+        "z_ssp_m": [0.0, 100.0],
+        "c_m_s": list(ssp_pekeris_3d_flat)
+    },
+    "bathymetry": {
+        "x_bty_m": [0.0, 10000.0],
+        "y_bty_m": [0.0, 10000.0],
+        "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
+        "density_g_cm3": 1.6,
+        "c_bty_m_s": 1700.0,
+        "attenuation_db": 0.5
+    },
+    "source": {
+        "position": [0.0, 0.0, 25.0],
+        "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 200).tolist(),
+        "launch_azim_deg": [-0.1, 0.0, 0.1]
+    },
+    "receivers": {
+        "x_rcvr_m": [0.0],
+        "y_rcvr_m": [30000.0],
+        "z_rcvr_m": [20.0]
+    },
+    "beam": {
+        "step_m": 15.0,
+        "max_steps": 40_000,
+        "max_range_m": 40_000.0
     }
 }
 
@@ -166,6 +333,12 @@ with open("examples/testm.json", "w") as f:
 
 with open("examples/testb.json", "w") as f:
     json.dump(env_bty, f, indent=2)
+
+with open("examples/testlha.json", "w") as f:
+    json.dump(env_lha, f, indent=2)
+
+with open("examples/testbb.json", "w") as f:
+    json.dump(env_bb, f, indent=2)
 
 
 
