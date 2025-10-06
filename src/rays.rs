@@ -1,4 +1,4 @@
-use ndarray::array;
+// removed ndarray::array to avoid small allocation in inner loop
 
 use crate::bty;
 use crate::input::config::SimulationConfig;
@@ -138,29 +138,25 @@ fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f32, step: usize, ssp: &SSPFie
     / (ray0.direction[0].powi(2) + ray0.direction[1].powi(2));
 
     // Construct the 2x2 matrix of ray-centered sound speed second derivatives (c_mat0)
-    let c_mat0 = array![
-        [ -cnn / c0.powi(2), -cmn / c0.powi(2) ],
-        [ -cmn / c0.powi(2), -cmm / c0.powi(2) ],
-    ];
+    // and apply it directly to update paraxial vectors without allocating ndarray arrays.
+    let c0_pow2 = c0 * c0;
+    let c11 = -cnn / c0_pow2; // c_mat0[0][0]
+    let c12 = -cmn / c0_pow2; // c_mat0[0][1] and [1][0]
+    let c22 = -cmm / c0_pow2; // c_mat0[1][1]
 
-    // Update paraxial vectors (p_tilde, q_tilde, p_hat, q_hat) using the c_mat0 matrix and c0 scalar
-    // p_tilde = p_tilde + half_ds * c_mat0 * q_tilde
-    let q_tilde_vec = ndarray::arr1(&ray0.q_tilde);
-    let p_tilde_update = c_mat0.dot(&q_tilde_vec);
-    ray1.p_tilde[0] = ray0.p_tilde[0] + ds * p_tilde_update[0];
-    ray1.p_tilde[1] = ray0.p_tilde[1] + ds * p_tilde_update[1];
+    // p_tilde = p_tilde + ds * c_mat0 * q_tilde
+    ray1.p_tilde[0] = ray0.p_tilde[0] + ds * (c11 * ray0.q_tilde[0] + c12 * ray0.q_tilde[1]);
+    ray1.p_tilde[1] = ray0.p_tilde[1] + ds * (c12 * ray0.q_tilde[0] + c22 * ray0.q_tilde[1]);
 
-    // q_tilde = q_tilde + half_ds * c0 * p_tilde
+    // q_tilde = q_tilde + ds * c0 * p_tilde
     ray1.q_tilde[0] = ray0.q_tilde[0] + ds * c0 * ray0.p_tilde[0];
     ray1.q_tilde[1] = ray0.q_tilde[1] + ds * c0 * ray0.p_tilde[1];
 
-    // p_hat = p_hat + half_ds * c_mat0 * q_hat
-    let q_hat_vec = ndarray::arr1(&ray0.q_hat);
-    let p_hat_update = c_mat0.dot(&q_hat_vec);
-    ray1.p_hat[0] = ray0.p_hat[0] + ds * p_hat_update[0];
-    ray1.p_hat[1] = ray0.p_hat[1] + ds * p_hat_update[1];
+    // p_hat = p_hat + ds * c_mat0 * q_hat
+    ray1.p_hat[0] = ray0.p_hat[0] + ds * (c11 * ray0.q_hat[0] + c12 * ray0.q_hat[1]);
+    ray1.p_hat[1] = ray0.p_hat[1] + ds * (c12 * ray0.q_hat[0] + c22 * ray0.q_hat[1]);
 
-    // q_hat = q_hat + half_ds * c0 * p_hat
+    // q_hat = q_hat + ds * c0 * p_hat
     ray1.q_hat[0] = ray0.q_hat[0] + ds * c0 * ray0.p_hat[0];
     ray1.q_hat[1] = ray0.q_hat[1] + ds * c0 * ray0.p_hat[1];
 

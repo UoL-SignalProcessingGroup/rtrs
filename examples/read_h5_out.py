@@ -180,8 +180,8 @@ def main():
     print(tl)
     
 
-    # plot_rays_xz(rays)
-    # plot_rays_yz(rays)
+    plot_rays_xz(rays)
+    plot_rays_yz(rays)
     # plot_rays_xy(rays)
     # plot_rays_3d(rays)
     # plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
@@ -189,7 +189,7 @@ def main():
     plot_line_tl_y(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=len(z_m)//2)
     plot_line_tl_z(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
     plot_tl_yz(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2)
-    plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=0, y_idx=0, z_idx=0)
+    plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=-1, y_idx=-1, z_idx=len(z_m)//2)
     plt.show()  
     
 
