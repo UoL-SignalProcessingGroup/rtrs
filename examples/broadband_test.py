@@ -39,9 +39,9 @@ class BroadbandTest:
 
         return source_spectrum, frequencies
 
-fs = 400        # Sampling frequency (Hz)
+fs = 4000        # Sampling frequency (Hz)
 t = np.arange(0.0, 1.0, 1.0/fs)      # Time vector from 0 to 1 second
-f0 = 50.0      # Center frequency of the Gaussian pulse (Hz)
+f0 = 500.0      # Center frequency of the Gaussian pulse (Hz)
 amp = 1.0      # Amplitude of the pulse
 source_len = 4
 
@@ -95,7 +95,7 @@ env_bb = {
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
         "density_g_cm3": 1.5,
         "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.0
+        "attenuation_db": 0.2
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],

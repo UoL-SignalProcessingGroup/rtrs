@@ -26,12 +26,12 @@ env_p = {
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
         "density_g_cm3": 1.5,
         "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.0
+        "attenuation_db": 0.5
     },
     "source": {
         "position": [0.0, 0.0, 25.0],
-        "freq_hz": [50.0],
-        "launch_elev_deg": np.linspace(-25.0, 25.0, 100).tolist(),
+        "freq_hz": [500.0],
+        "launch_elev_deg": np.linspace(-15.0, 15.0, 400).tolist(),
         "launch_azim_deg": [-0.05, 0.0, 0.05]
     },
     "receivers": {

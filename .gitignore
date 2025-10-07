@@ -4,3 +4,5 @@ dev
 # Ignore output files from examples
 examples/*.h5
 examples/*.json
+
+./venv*
