@@ -2,6 +2,22 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 
+def munk(Z, min_c=1500.0, epsilon=0.00737, min_z1=1300.0, min_z2=1300.0):
+    """
+    Make munk ssp
+    :param Z: (numpy.ndarray)
+    :param min_c: (float)
+    :param epsilon: (float)
+    :param min_z1: (float)
+    :param min_z2: (float)
+    :return: ssp, c (list, numpy.ndarray)
+    """
+
+    # Calculate Munk profile
+    zbar = (2 * (Z - min_z1)) / min_z2
+    c = min_c * (1.0 + epsilon * (zbar - 1 + np.exp(-zbar)))
+
+    return c
 
 def load_rays(h5path):
     with h5py.File(h5path, 'r') as f:
@@ -43,6 +59,7 @@ def load_cmpx_pressure(h5path):
     return frequency_hz, x_m, y_m, z_m, pressure_re + 1j * pressure_im
 
 
+
 def plot_rays_3d(rays):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -79,28 +96,28 @@ def plot_rays_bty_3d(rays, x_bty, y_bty, z_bty):
     ax.invert_zaxis()
     plt.tight_layout()
 
-def plot_rays_xz(rays):
+def plot_rays_yz(rays):
     plt.figure()
     for ray in rays:
         x = ray[:,1]
         z = ray[:,2]
         plt.plot(x, z, lw=0.8)
-    plt.xlabel('x (m)')
+    plt.xlabel('y (m)')
     plt.ylabel('depth (m)')
-    plt.title('Ray paths (x-z plane)')
+    plt.title('Ray paths (y-z plane)')
     plt.gca().invert_yaxis()
     plt.grid()
     plt.tight_layout()
 
-def plot_rays_yz(rays):
+def plot_rays_xz(rays):
     plt.figure()
     for ray in rays:
         y = ray[:,0]
         z = ray[:,2]
         plt.plot(y, z, lw=0.8)
-    plt.xlabel('y (m)')
+    plt.xlabel('x (m)')
     plt.ylabel('depth (m)')
-    plt.title('Ray paths (y-z plane)')
+    plt.title('Ray paths (x-z plane)')
     plt.gca().invert_yaxis()
     plt.grid()
     plt.tight_layout()
@@ -167,32 +184,3 @@ def plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx, y_idx, z_idx):
     plt.title(f'Pressure Amplitude at x={x_m[x_idx]:.1f} m, y={y_m[y_idx]:.1f} m, z={z_m[z_idx]:.1f} m')
     plt.grid()
     plt.tight_layout()
-
-def main():
-    h5file = "examples/testm.h5"
-    rays = load_rays(h5file)
-    print(len(rays[0]), "number of steps in first ray")
-    x_bty, y_bty, z_bty = load_bty(h5file)
-    freq, x_m, y_m, z_m, pressure = load_cmpx_pressure(h5file)
-    pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
-    print(pressure.shape)
-    tl = - 20 * np.log10(np.abs(pressure))
-    print(tl)
-    
-
-    plot_rays_xz(rays)
-    plot_rays_yz(rays)
-    # plot_rays_xy(rays)
-    # plot_rays_3d(rays)
-    # plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
-    plot_line_tl_x(tl[0,:,:,:], x_m, y_m, z_m, y_idx=len(y_m)//2, z_idx=len(z_m)//2)
-    plot_line_tl_y(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=len(z_m)//2)
-    plot_line_tl_z(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
-    plot_tl_yz(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2)
-    plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=-1, y_idx=-1, z_idx=len(z_m)//2)
-    plt.show()  
-    
-
-if __name__ == '__main__':
-    main()
-    

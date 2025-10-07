@@ -159,9 +159,44 @@ env_m = {
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
-        # "freq_hz": [1000.0],
-        "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
-        "launch_elev_deg": np.linspace(-25.0, 25.0, 4000).tolist(),
+        "freq_hz": [1000.0],
+        # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 4000).tolist(),
+        "launch_azim_deg": [-0.001, 0.0, 0.001]
+    },
+    "receivers": {
+        "x_rcvr_m": [0.0],
+        "y_rcvr_m": np.linspace(0.0, 50000.0, 2000).tolist(),
+        "z_rcvr_m": [1000.0] # np.linspace(0.0, 5000.0, 500).tolist()
+    },
+    "beam": {
+        "step_m": 100.0,
+        "max_steps": 100_000,
+        "max_range_m": 50_000.0
+    }
+}
+
+env_m2d = {
+    "ssp": {
+        
+        "x_ssp_m": [0.0, 5000.0],
+        "y_ssp_m": [0.0, 5000.0],
+        "z_ssp_m": list(z),
+        "c_m_s": list(munk_ssp_3d_flat)
+    },
+    "bathymetry": {
+        "x_bty_m": [0.0, 50000.0],
+        "y_bty_m": [0.0, 50000.0],
+        "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
+        "density_g_cm3": 1.6,
+        "c_bty_m_s": 1700.0,
+        "attenuation_db": 1.0
+    },
+    "source": {
+        "position": [0.0, 0.0, 1000.0],
+        "freq_hz": [1000.0],
+        # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-10.0, 10.0, 4000).tolist(),
         "launch_azim_deg": [-0.001, 0.0, 0.001]
     },
     "receivers": {
@@ -258,39 +293,6 @@ env_lha = {
     }
 }
 
-env_lha = {
-    "ssp": {
-        "x_ssp_m": [0.0, 10000.0],
-        "y_ssp_m": [0.0, 10000.0],
-        "z_ssp_m": [0.0, 100.0],
-        "c_m_s": list(ssp_pekeris_3d_flat)
-    },
-    "bathymetry": {
-        "x_bty_m": [0.0, 10000.0],
-        "y_bty_m": [0.0, 10000.0],
-        "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.6,
-        "c_bty_m_s": 1700.0,
-        "attenuation_db": 0.5
-    },
-    "source": {
-        "position": [0.0, 0.0, 25.0],
-        "freq_hz": [1000.0],
-        "launch_elev_deg": np.linspace(-10.0, 10.0, 200).tolist(),
-        "launch_azim_deg": [-0.1, 0.0, 0.1]
-    },
-    "receivers": {
-        "x_rcvr_m": x,
-        "y_rcvr_m": y,
-        "z_rcvr_m": z
-    },
-    "beam": {
-        "step_m": 15.0,
-        "max_steps": 10_000,
-        "max_range_m": 10_000.0
-    }
-}
-
 env_bb = {
     "ssp": {
         "x_ssp_m": [0.0, 10000.0],
@@ -339,6 +341,9 @@ with open("examples/testlha.json", "w") as f:
 
 with open("examples/testbb.json", "w") as f:
     json.dump(env_bb, f, indent=2)
+
+with open("examples/testm2d.json", "w") as f:
+    json.dump(env_m2d, f, indent=2)
 
 
 

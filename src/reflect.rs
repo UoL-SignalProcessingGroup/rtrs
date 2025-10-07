@@ -26,7 +26,6 @@ pub fn surface_reflection(ray_history: &mut Vec<Ray>) {
 }
 
 pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
-    // acoustic vacuum pressure release bottom reflections 
 
     let ray = ray_history.last_mut().unwrap();
 
@@ -112,11 +111,12 @@ pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
         // `bty_field.atten` is nepers per meter for pressure amplitude. Assume a
         // nominal two-way effective path through the bottom for each reflection.
         // This is model dependent; choose 2.0 m two-way path length per reflection.
+        ray.phase += refl_c.arg();
         ray.amplitude *= refl_c.norm();
         let two_way_path_m = 2.0_f32;
         let atten_loss = (-bty_field.atten * two_way_path_m).exp();
         ray.amplitude *= atten_loss;
-            ray.phase += refl_c.arg();
+            
         // println!("Bottom reflection: refl_c = {}, new amp = {}, new phase = {}", refl_c, ray.amplitude, ray.phase);
         
     }

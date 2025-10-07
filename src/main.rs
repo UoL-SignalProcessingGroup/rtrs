@@ -107,6 +107,10 @@ fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
             // save ray path history for output
             let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f32; 3]>>();
             ray_paths.push(path);
+            
+            // println!("{} rays traced at elev {:.2} deg, azim {:.2} deg ({} steps) in {:.3} s + {:.3} s", 
+            //     ray_paths.len(), elev.to_degrees(), azim.to_degrees(), ray_history.len(), t_trace, t_infl
+            // );
         }
     }
 

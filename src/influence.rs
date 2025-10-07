@@ -102,8 +102,13 @@ pub fn gaussian_beam_influence(
         let q_t_b = ray_history[is + 1].q_tilde;
         let q_h_a = ray_history[is].q_hat;
         let q_h_b = ray_history[is + 1].q_hat;
-        max_radius_a[is] = beam_window * q_h_a[1].abs().max(q_h_b[1].abs());
-        max_radius_b[is] = beam_window * q_t_a[0].abs().max(q_t_b[0].abs());
+        // compute vector norms L1 = ||q_tilde|| and L2 = ||q_hat|| (Euclidean)
+        let l2_a = (q_h_a[0]*q_h_a[0] + q_h_a[1]*q_h_a[1]).sqrt();
+        let l2_b = (q_h_b[0]*q_h_b[0] + q_h_b[1]*q_h_b[1]).sqrt();
+        let l1_a = (q_t_a[0]*q_t_a[0] + q_t_a[1]*q_t_a[1]).sqrt();
+        let l1_b = (q_t_b[0]*q_t_b[0] + q_t_b[1]*q_t_b[1]).sqrt();
+        max_radius_a[is] = beam_window * l2_a.max(l2_b);
+        max_radius_b[is] = beam_window * l1_a.max(l1_b);
     }
 
     // Process each receiver in the 3D grid
@@ -172,8 +177,10 @@ pub fn gaussian_beam_influence(
 
                     // Find closest point on ray segment to receiver
                     let to_receiver = sub(&receiver_pos, &ray_start);
-                    let mut t = dot(&to_receiver, &ray_vec) / ray_length_sq;
-                    t = t.max(0.0).min(1.0);
+                    let t_raw = dot(&to_receiver, &ray_vec) / ray_length_sq;
+                    // reject contributions from projections outside the segment (no backward extrapolation)
+                    if t_raw < 0.0 || t_raw > 1.0 { continue; }
+                    let t = t_raw;
                     let closest_point = [
                         ray_start[0] + t * ray_vec[0],
                         ray_start[1] + t * ray_vec[1],
@@ -203,8 +210,10 @@ pub fn gaussian_beam_influence(
 
                     // Beam coordinates using local normals
                     let offset = sub(&receiver_pos, &closest_point);
-                    let m = dot(&offset, &e1).abs();
-                    let n = dot(&offset, &e2).abs();
+                    // let m = dot(&offset, &e1).abs();
+                    // let n = dot(&offset, &e2).abs();
+                    let n = dot(&offset, &e1).abs();
+                    let m = dot(&offset, &e2).abs();
 
                     let a = if q_hat[1].abs() > 1e-12 {
                         ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs()
