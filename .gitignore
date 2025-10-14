@@ -6,3 +6,4 @@ examples/*.h5
 examples/*.json
 
 ./venv*
+examples/__pycache__
