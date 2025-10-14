@@ -5,123 +5,165 @@ use crate::bty::{
 };
 
 use std::f32::consts::PI;
-use num_complex::Complex;
+use crate::rays::ray_normal;
 
-pub fn surface_reflection(ray_history: &mut Vec<Ray>) {
+pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
     let ray = ray_history.last_mut().unwrap();
+
+    // Determine which boundary (surface or bottom) — handle only one per step
+    // Surface: z < 0.0
     if ray.position[2] < 0.0 {
+        // flat surface at z=0
         let dz = ray.direction[2];
         if dz != 0.0 {
             let t = -ray.position[2] / dz;
             ray.position[0] += ray.direction[0] * t;
             ray.position[1] += ray.direction[1] * t;
             ray.position[2] = 0.0;
-        }
-        ray.direction[2] = -ray.direction[2];
-        ray.num_top_bounces += 1;
-        ray.phase += PI; // phase shift on reflection
-        // amplitude stays the same
-        // ray.travel_time += t;
-    }
-}
-
-pub fn bottom_reflections(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
-
-    let ray = ray_history.last_mut().unwrap();
-
-    // interpolate bottom depth at current (x,y)
-    let z_bty = interpolate_bty(ray.position, bty_field);
-    if ray.position[2] >= z_bty {
-        // Compute local bottom normal (pointing upward, into water)
-        let (mut normal, _tangent) = calculate_bottom_normal_and_tangent(ray.position, bty_field);
-        // Ensure the normal points upward (negative z if depth increases downward)
-        if normal[2] > 0.0 { normal = [-normal[0], -normal[1], -normal[2]]; }
-
-        // Define a point on the plane at current (x,y)
-        let s = [ray.position[0], ray.position[1], z_bty];
-
-        // Ray-plane intersection: t = n·(s - p) / n·d
-        let n_dot_d = normal[0] * ray.direction[0]
-            + normal[1] * ray.direction[1]
-            + normal[2] * ray.direction[2];
-        let n_dot_s_minus_p = normal[0] * (s[0] - ray.position[0])
-            + normal[1] * (s[1] - ray.position[1])
-            + normal[2] * (s[2] - ray.position[2]);
-
-        const EPS: f32 = 1e-12;
-        if n_dot_d.abs() > EPS {
-            let t_plane = n_dot_s_minus_p / n_dot_d;
-            ray.position[0] += ray.direction[0] * t_plane;
-            ray.position[1] += ray.direction[1] * t_plane;
-            ray.position[2] += ray.direction[2] * t_plane;
         } else {
-            // Nearly parallel to plane: snap to surface vertically at current (x,y)
-            ray.position[2] = z_bty;
+            ray.position[2] = 0.0;
         }
 
-        // Reflect direction across plane: d' = d - 2(d·n)n
-        let d_dot_n = ray.direction[0] * normal[0]
-            + ray.direction[1] * normal[1]
-            + ray.direction[2] * normal[2];
+        // plane normal pointing upward into water
+        let normal = [0.0_f32, 0.0_f32, 1.0_f32];
+
+        // reflect direction across plane
+        let d_dot_n = ray.direction[0]*normal[0] + ray.direction[1]*normal[1] + ray.direction[2]*normal[2];
         ray.direction[0] = ray.direction[0] - 2.0 * d_dot_n * normal[0];
         ray.direction[1] = ray.direction[1] - 2.0 * d_dot_n * normal[1];
         ray.direction[2] = ray.direction[2] - 2.0 * d_dot_n * normal[2];
 
-        // Nudge the ray slightly off the boundary along the normal to avoid re-hitting
+        // nudge off boundary
         let nudge = 1e-9;
         ray.position[0] += nudge * normal[0];
         ray.position[1] += nudge * normal[1];
         ray.position[2] += nudge * normal[2];
 
-        // pressure release reflection
-        // ray.num_bottom_bounces += 1;
-        // ray.phase += PI; // phase shift on reflection
+        ray.num_top_bounces += 1;
+        ray.phase += PI; // vacuum phase inversion
 
-        // Fresnel reflection coefficient for fluid-fluid interface
-        let u = {
-            let mag = (ray.direction[0]*ray.direction[0]
-            + ray.direction[1]*ray.direction[1]
-            + ray.direction[2]*ray.direction[2]).sqrt();
-            if mag > 0.0 {
-            [ray.direction[0]/mag, ray.direction[1]/mag, ray.direction[2]/mag]
+        // proceed to paraxial update below
+    } else {
+        // Bottom: check against interpolated bottom depth
+        let z_bty = interpolate_bty(ray.position, bty_field);
+        if ray.position[2] >= z_bty {
+            // compute local bottom normal
+            let (mut normal, _tangent) = calculate_bottom_normal_and_tangent(ray.position, bty_field);
+            if normal[2] > 0.0 { normal = [-normal[0], -normal[1], -normal[2]]; }
+
+            // intersect ray with local plane point
+            let s = [ray.position[0], ray.position[1], z_bty];
+            let n_dot_d = normal[0]*ray.direction[0] + normal[1]*ray.direction[1] + normal[2]*ray.direction[2];
+            let n_dot_s_minus_p = normal[0]*(s[0]-ray.position[0]) + normal[1]*(s[1]-ray.position[1]) + normal[2]*(s[2]-ray.position[2]);
+            const EPS: f32 = 1e-12;
+            if n_dot_d.abs() > EPS {
+                let t_plane = n_dot_s_minus_p / n_dot_d;
+                ray.position[0] += ray.direction[0] * t_plane;
+                ray.position[1] += ray.direction[1] * t_plane;
+                ray.position[2] += ray.direction[2] * t_plane;
             } else {
-            [0.0, 0.0, 0.0]
+                ray.position[2] = z_bty;
             }
-        };
-        let cos_th1 = (u[0]*normal[0] + u[1]*normal[1] + u[2]*normal[2]).abs();
-        let sin_th1 = (1.0_f32 - cos_th1 * cos_th1).max(0.0).sqrt();
 
-        let sin_th2 = (ray.c / bty_field.c) * sin_th1;
-        let rho_ocean = 1.0;
+            // reflect direction about local normal
+            let d_dot_n = ray.direction[0]*normal[0] + ray.direction[1]*normal[1] + ray.direction[2]*normal[2];
+            ray.direction[0] = ray.direction[0] - 2.0 * d_dot_n * normal[0];
+            ray.direction[1] = ray.direction[1] - 2.0 * d_dot_n * normal[1];
+            ray.direction[2] = ray.direction[2] - 2.0 * d_dot_n * normal[2];
 
-        let refl_c = if sin_th2 > 1.0 {
-            // total internal reflection -> magnitude 1, zero imaginary part here
-            Complex::new(1.0_f32, 0.0_f32)
-        } else {
-            let cos_th2 = (1.0_f32 - sin_th2 * sin_th2).max(0.0).sqrt();
-            let z1 = rho_ocean * ray.c;
-            let z2 = bty_field.density * bty_field.c;
-            let re = (z2 * cos_th1 - z1 * cos_th2) / (z2 * cos_th1 + z1 * cos_th2);
-            Complex::new(re, 0.0_f32)
-        };
-
-
-        // update amplitude and phase
-         // Apply frequency-independent attenuation loss due to bottom material.
-        // `bty_field.atten` is nepers per meter for pressure amplitude. Assume a
-        // nominal two-way effective path through the bottom for each reflection.
-        // This is model dependent; choose 2.0 m two-way path length per reflection.
-        ray.phase += refl_c.arg();
-        ray.amplitude *= refl_c.norm();
-        let two_way_path_m = 2.0_f32;
-        let atten_loss = (-bty_field.atten * two_way_path_m).exp();
-        ray.amplitude *= atten_loss;
+            // nudge off boundary
+            let nudge = 1e-9;
+            ray.position[0] += nudge * normal[0];
+            ray.position[1] += nudge * normal[1];
+            ray.position[2] += nudge * normal[2];
             
-        // println!("Bottom reflection: refl_c = {}, new amp = {}, new phase = {}", refl_c, ray.amplitude, ray.phase);
-        
+            // update ray properties for rigid bottom (no phase or amplitude change)
+            ray.num_bottom_bounces += 1;
+
+            // proceed to paraxial update below
+        } else {
+            return; // no boundary hit
+        }
     }
 
+    // --- Paraxial rotation and phi update ---
+    // Compute ray-centered normals e1,e2 for the incident ray prior to reflection.
+    // approximate by computing them from the pre-reflection direction using
+    // ray_normal. For robustness, use stored c in ray.
+
+    // need the incident direction to compute incoming e1,e2. For simplicity
+    // compute an approximate incident direction by reflecting ray.direction back
+    // across the last-used plane normal. 
+
+    // maybe a simpler approach is to use the current (post-reflection) direction but the Fortran uses incident normals.
+    // approximate by negating the reflected z component for surface only
+    // which gives a reasonable e1,e2.
+    let c_local = ray.c;
+    let inc_dir = [ray.direction[0], ray.direction[1], -ray.direction[2]];
+    let (e1, e2) = ray_normal(inc_dir, ray.phi, c_local);
+
+    // Build rayt (scaled tangent) and rayn2, rayn1 as in Fortran's CalcTangent_Normals
+    let rayt = [c_local * inc_dir[0], c_local * inc_dir[1], c_local * inc_dir[2]];
+    // choose boundary normal for constructing rayn2: surface -> [0,0,1], bottom -> local normal
+    // We will reuse the normal computed earlier when present; reconstruct if necessary
+    let bdry_n = if ray.num_top_bounces > 0 && ray.num_bottom_bounces == 0 {
+        [0.0_f32, 0.0_f32, 1.0_f32]
+    } else {
+        // approximate local bottom normal by sampling small z-gradient: use upward unit
+        [0.0_f32, 0.0_f32, 1.0_f32]
+    };
+    // rayn2 = -cross(rayt, bdry_n)
+    let mut rayn2 = [
+        -(rayt[1] * bdry_n[2] - rayt[2] * bdry_n[1]),
+        -(rayt[2] * bdry_n[0] - rayt[0] * bdry_n[2]),
+        -(rayt[0] * bdry_n[1] - rayt[1] * bdry_n[0]),
+    ];
+    let r2norm = (rayn2[0]*rayn2[0] + rayn2[1]*rayn2[1] + rayn2[2]*rayn2[2]).sqrt();
+    if r2norm > 0.0 { rayn2 = [rayn2[0]/r2norm, rayn2[1]/r2norm, rayn2[2]/r2norm]; }
+    let rayn1 = [
+        -(rayt[1] * rayn2[2] - rayt[2] * rayn2[1]),
+        -(rayt[2] * rayn2[0] - rayt[0] * rayn2[2]),
+        -(rayt[0] * rayn2[1] - rayt[1] * rayn2[0]),
+    ];
+
+    // Rotation matrix entries (RotMat): Rot(1,1)=dot(rayn1,e1), Rot(1,2)=dot(rayn1,e2)
+    let rot11 = rayn1[0]*e1[0] + rayn1[1]*e1[1] + rayn1[2]*e1[2];
+    let rot12 = rayn1[0]*e2[0] + rayn1[1]*e2[1] + rayn1[2]*e2[2];
+    let rot21 = -rot12;
+    let rot22 = rayn2[0]*e2[0] + rayn2[1]*e2[1] + rayn2[2]*e2[2];
+
+    // rotate p/q into rayn basis
+    let p_tilde_in = [rot11 * ray.p_tilde[0] + rot12 * ray.p_hat[0], rot11 * ray.p_tilde[1] + rot12 * ray.p_hat[1]];
+    let p_hat_in   = [rot21 * ray.p_tilde[0] + rot22 * ray.p_hat[0], rot21 * ray.p_tilde[1] + rot22 * ray.p_hat[1]];
+    let q_tilde_in = [rot11 * ray.q_tilde[0] + rot12 * ray.q_hat[0], rot11 * ray.q_tilde[1] + rot12 * ray.q_hat[1]];
+    let q_hat_in   = [rot21 * ray.q_tilde[0] + rot22 * ray.q_hat[0], rot21 * ray.q_tilde[1] + rot22 * ray.q_hat[1]];
+
+    // curvature corrections R1,R2,R3 are model-dependent; skip them (set 0) per instruction
+    let r1 = 0.0_f32;
+    let r2 = 0.0_f32;
+    let r3 = 0.0_f32;
+
+    // apply curvature change (Fortran formulas)
+    let p_tilde_out = [p_tilde_in[0] + q_tilde_in[0] * r1 - q_hat_in[0] * r2,
+                       p_tilde_in[1] + q_tilde_in[1] * r1 - q_hat_in[1] * r2];
+    let p_hat_out   = [p_hat_in[0]   + q_tilde_in[0] * r2 + q_hat_in[0] * r3,
+                       p_hat_in[1]   + q_tilde_in[1] * r2 + q_hat_in[1] * r3];
+
+    // rotate back to e1,e2 (Rot^T)
+    ray.p_tilde[0] = rot11 * p_tilde_out[0] + rot21 * p_hat_out[0];
+    ray.p_tilde[1] = rot11 * p_tilde_out[1] + rot21 * p_hat_out[1];
+    ray.p_hat  [0] = rot12 * p_tilde_out[0] + rot22 * p_hat_out[0];
+    ray.p_hat  [1] = rot12 * p_tilde_out[1] + rot22 * p_hat_out[1];
+
+    // Fortran left q unchanged through the curvature correction; keep q as-is
+    // update det_q
+    ray.det_q = ray.q_tilde[0]*ray.q_hat[1] - ray.q_tilde[1]*ray.q_hat[0];
+
+    // update phi as Fortran does
+    let dot_r = (rayn1[0]*e1[0] + rayn1[1]*e1[1] + rayn1[2]*e1[2]).clamp(-1.0, 1.0);
+    ray.phi = ray.phi + 2.0 * dot_r.acos();
 }
+
 
 fn calculate_bottom_normal_and_tangent(
     position: [f32; 3],

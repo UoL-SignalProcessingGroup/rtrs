@@ -1,5 +1,3 @@
-// removed ndarray::array to avoid small allocation in inner loop
-
 use crate::bty;
 use crate::input::config::SimulationConfig;
 use crate::ssp::{
@@ -11,7 +9,7 @@ use crate::ssp::{
 };
 
 use crate::reflect::{
-    bottom_reflections, surface_reflection
+    reflect_boundaries,
 };
 
 #[derive(Clone)]
@@ -48,7 +46,6 @@ pub fn trace_ray(
 
     let c = interpolate_c(config.source.position, &ssp_field);
 
-
     let ray_init = Ray {
         position: config.source.position,
         direction: [ elev.cos() * azim.sin() / c, elev.cos() * azim.cos() / c, elev.sin()/ c],
@@ -75,9 +72,8 @@ pub fn trace_ray(
         euler_step_ray(&mut ray_history, config.beam.step_m, step, ssp_field);
         // adaptive_heun_euler_step_ray(&mut ray_history, config.beam.step_m, step, ssp_field);
 
-        // check for boundary reflections
-        surface_reflection(&mut ray_history);
-        bottom_reflections(&mut ray_history, bty_field);
+        // check for boundary reflections (unified handler)
+        reflect_boundaries(&mut ray_history, bty_field);
 
         // check for termination conditions
         if check_max_range(&mut ray_history, config.beam.max_range_m, config.source.position) {
