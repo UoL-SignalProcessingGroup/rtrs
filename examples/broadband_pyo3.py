@@ -3,8 +3,10 @@ import matplotlib.pyplot as plt
 import json
 import os
 import python_utils
+import rtrs
 
 class BroadbandTest:
+    """Class to generate broadband pulse source time series and compute its spectrum."""
     
     def __init__(self, fs, f0, amp, source_len, t):
         self.fs = fs
@@ -140,42 +142,6 @@ ssp_pekeris = np.array([1500.0, 1500.0])
 ssp_pekeris_3d = np.tile(ssp_pekeris, (2, 2, 1))
 ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 
-jsonfile = "examples/testbb.json"
-h5file = "examples/testbb.h5"
-
-
-env_bbp = {
-    "ssp": {
-        "x_ssp_m": [0.0, 30000.0],
-        "y_ssp_m": [0.0, 30000.0],
-        "z_ssp_m": list(z_pekeris),
-        "c_m_s": list(ssp_pekeris_3d_flat)
-    },
-    "bathymetry": {
-        "x_bty_m": [0.0, 30000.0],
-        "y_bty_m": [0.0, 30000.0],
-        "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.5,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.2
-    },
-    "source": {
-        "position": [0.0, 0.0, 25.0],
-        "freq_hz": frequencies.tolist(),
-        "launch_elev_deg": np.linspace(-10.0, 10.0, 1000).tolist(),
-        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
-    },
-    "receivers": {
-        "x_rcvr_m": [0.0],
-        "y_rcvr_m": [30000.0],
-        "z_rcvr_m": [20.0]
-    },
-    "beam": {
-        "step_m": 10.0,
-        "max_steps": 25_000,
-        "max_range_m": 35_000.0
-    }
-}
 
 env_bbm = {
     "ssp": {
@@ -210,14 +176,22 @@ env_bbm = {
     }
 }
 
-with open(jsonfile, "w") as f:
-    json.dump(env_bbm, f, indent=2)
+result = rtrs.run_simulation(env_bbm)
 
-# run rtrs with the JSON-like input (keeps original behavior of the example)
-os.system(f"cargo run --release  {jsonfile}")
+# Extract ray paths and pressure_field
+ray_paths = result["ray_paths"]
+pf = result["pressure_field"]
 
-freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(h5file)
-pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
+freq = pf["frequency_hz"]
+x_m = pf["x_m"]
+y_m = pf["y_m"]
+z_m = pf["z_m"]
+shape = tuple(pf["shape"])
+
+# Reconstruct complex pressure array from flat re/im
+re = np.array(pf["pressure_re"], dtype=np.float32).reshape(shape)
+im = np.array(pf["pressure_im"], dtype=np.float32).reshape(shape)
+pressure = re + 1j * im
 
 # Multiply frequency-domain pressure by source spectrum. Ensure frequency axes align.
 # source_spectrum is one-sided (rfft) with frequencies = np.fft.rfftfreq(n, 1/fs)

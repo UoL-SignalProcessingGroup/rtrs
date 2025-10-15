@@ -233,6 +233,7 @@ pub fn gaussian_beam_influence(
 
                     // Travel time to closest point
                     let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
+                    // println!("amp = {}, delay = {}", ray_history[is - 1].amplitude, delay);
 
                     let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
                     let amp = const_amp * w;

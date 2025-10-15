@@ -31,10 +31,10 @@ env_m = {
         "position": [0.0, 0.0, 1000.0],
         "freq_hz": [50.0],
         # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
-        "launch_elev_deg": np.linspace(-20.0, 2.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-20.0, 2.0, 100).tolist(),
         # "launch_elev_deg": [0.0],
-        "launch_azim_deg": [0.0]
-        # "launch_azim_deg": np.linspace(-0.05, 0.05, 3).tolist()
+        # "launch_azim_deg": [0.0]
+        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
         "x_rcvr_m": [0.0],
@@ -60,6 +60,7 @@ x_bty, y_bty, z_bty = python_utils.load_bty(h5file)
 freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(h5file)
 pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
 tl = - 20 * np.log10(np.abs(pressure))
+# print(pressure)
 
 
 python_utils.plot_rays_xz(rays)
@@ -73,6 +74,7 @@ z_idx = (np.abs(z_m - z_val)).argmin()
 python_utils.plot_line_tl_y(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=z_idx)
 # python_utils.plot_line_tl_z(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
 python_utils.plot_tl_yz(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2)
+python_utils.plot_pressure_yz(np.real(pressure[0,:,:,:]), x_m, y_m, z_m, x_idx=len(x_m)//2)
 python_utils.plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=-1, y_idx=-1, z_idx=len(z_m)//2)
 plt.show()  
 

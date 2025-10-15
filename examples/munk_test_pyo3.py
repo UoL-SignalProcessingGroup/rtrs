@@ -38,8 +38,8 @@ env_m = {
     "source": {
         "position": [0.0, 0.0, 1000.0],
         "freq_hz": [50.0],
-        "launch_elev_deg": np.linspace(-20.0, 20.0, 1000).tolist(),
-        "launch_azim_deg": np.linspace(-0.05, 0.05, 3).tolist()
+        "launch_elev_deg": np.linspace(-20.0, 2.0, 100).tolist(),
+        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
         "x_rcvr_m": [0.0],
@@ -47,7 +47,7 @@ env_m = {
         "z_rcvr_m": np.linspace(0.0, 5000.0, 500).tolist()
     },
     "beam": {
-        "step_m": 100.0,
+        "step_m": 10.0,
         "max_steps": 100000,
         "max_range_m": 50000.0
     }

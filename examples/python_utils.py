@@ -168,13 +168,25 @@ def plot_line_tl_z(tl, x_m, y_m, z_m, x_idx, y_idx):
 def plot_tl_yz(tl, x_m, y_m, z_m, x_idx):
     plt.figure()
     Y, Z = np.meshgrid(y_m, z_m)
-    plt.pcolormesh(Y, Z, tl[x_idx, :, :].T, shading='auto', cmap='jet_r')
+    plt.pcolormesh(Y, Z, tl[x_idx, :, :].T, shading='auto', cmap='jet_r', vmin=50, vmax=150)
     plt.colorbar(label='Transmission Loss (dB)')
     plt.xlabel('y (m)')
     plt.ylabel('depth (m)')
     plt.title(f'Transmission Loss (y-z plane) at x={x_m[x_idx]:.1f} m')
     plt.gca().invert_yaxis()
     plt.tight_layout()
+
+def plot_pressure_yz(pressure, x_m, y_m, z_m, x_idx):
+    plt.figure()
+    Y, Z = np.meshgrid(y_m, z_m)
+    plt.pcolormesh(Y, Z, pressure[x_idx, :, :].T, shading='auto', cmap='bwr', vmin=-0.0001, vmax=0.0001)
+    plt.colorbar(label='Pressure')
+    plt.xlabel('y (m)')
+    plt.ylabel('depth (m)')
+    plt.title(f'Pressure (y-z plane) at x={x_m[x_idx]:.1f} m')
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+
 
 def plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx, y_idx, z_idx):
     plt.figure()

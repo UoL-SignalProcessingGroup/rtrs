@@ -4,6 +4,9 @@ use crate::ssp::init_ssp;
 use crate::bty;
 use crate::influence::{gaussian_beam_influence, init_pressure_field, PressureField};
 use std::f32::consts::PI;
+use std::time::Instant;
+
+const TIMER: bool = false;
 
 pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
 
@@ -34,25 +37,38 @@ pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
     // angular frequency
     let omega: Vec<f32> = cfg.source.freq_hz.iter().map(|f| 2.0 * PI * f).collect();
 
+    // timing containers (keep in outer scope so they're available after the loop)
+    let mut trace_durations: Vec<f32> = if TIMER { Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len()) } else { Vec::new() };
+    let mut influence_durations: Vec<f32> = if TIMER { Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len()) } else { Vec::new() };
+    
     // loop over launch angles
-    use std::time::Instant;
-
-    let mut trace_durations: Vec<f64> = Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len());
-    let mut influence_durations: Vec<f64> = Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len());
-
     for &azim in &launch_azim_rad {
         for &elev in &launch_elev_rad {
-            // trace rays
-            let t0 = Instant::now();
-            let mut ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
-            let t_trace = t0.elapsed().as_secs_f64();
-            trace_durations.push(t_trace);
 
-            // beam influence
-            let t1 = Instant::now();
-            gaussian_beam_influence(&mut ray_history, &mut pressure_field, elev, d_azim, d_elev, &omega);
-            let t_infl = t1.elapsed().as_secs_f64();
-            influence_durations.push(t_infl);
+            // run trace and influence; measure timings if enabled. Use a block expression
+            // so we can return the populated ray history and still keep timings in scope.
+            let ray_history = {
+                if TIMER {
+                    // trace rays (timed)
+                    let t0 = Instant::now();
+                    let mut rh = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
+                    let t_trace = t0.elapsed().as_secs_f32();
+                    trace_durations.push(t_trace);
+
+                    // beam influence (timed)
+                    let t1 = Instant::now();
+                    gaussian_beam_influence(&mut rh, &mut pressure_field, elev, d_azim, d_elev, &omega);
+                    let t_infl = t1.elapsed().as_secs_f32();
+                    influence_durations.push(t_infl);
+
+                    rh
+                } else {
+                    // no timing
+                    let mut rh = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
+                    gaussian_beam_influence(&mut rh, &mut pressure_field, elev, d_azim, d_elev, &omega);
+                    rh
+                }
+            };
 
             // save ray path history for output
             let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f32; 3]>>();
@@ -60,19 +76,22 @@ pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
         }
     }
 
-    // Print average timings
-    if !trace_durations.is_empty() {
-        let sum: f64 = trace_durations.iter().sum();
-        let avg = sum / (trace_durations.len() as f64);
-        println!("Average trace_ray time: {:.6} s over {} calls", avg, trace_durations.len());
-        println!("  (total time {:.3} s)", sum);
+    if TIMER {
+        // Print average timings
+        if !trace_durations.is_empty() {
+            let sum: f32 = trace_durations.iter().sum();
+            let avg = sum / (trace_durations.len() as f32);
+            println!("Average trace_ray time: {:.6} s over {} calls", avg, trace_durations.len());
+            println!("  (total time {:.3} s)", sum);
+        }
+        if !influence_durations.is_empty() {
+            let sum: f32 = influence_durations.iter().sum();
+            let avg = sum / (influence_durations.len() as f32);
+            println!("Average gaussian_beam_influence time: {:.6} s over {} calls", avg, influence_durations.len());
+            println!("  (total time {:.3} s)", sum);
+        }
     }
-    if !influence_durations.is_empty() {
-        let sum: f64 = influence_durations.iter().sum();
-        let avg = sum / (influence_durations.len() as f64);
-        println!("Average gaussian_beam_influence time: {:.6} s over {} calls", avg, influence_durations.len());
-        println!("  (total time {:.3} s)", sum);
-    }
+    
 
     return (ray_paths, pressure_field);
 }
