@@ -188,6 +188,12 @@ y_m = pf["y_m"]
 z_m = pf["z_m"]
 shape = tuple(pf["shape"])
 
+# delays and amplitudes
+delays = pf["delay_s"]
+amplitudes = pf["amplitude"]
+print('Receiver delays (s):', delays)
+print('Receiver amplitudes:', amplitudes)
+
 # Reconstruct complex pressure array from flat re/im
 re = np.array(pf["pressure_re"], dtype=np.float32).reshape(shape)
 im = np.array(pf["pressure_im"], dtype=np.float32).reshape(shape)
