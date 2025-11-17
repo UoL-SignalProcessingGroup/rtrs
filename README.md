@@ -2,26 +2,39 @@
 
 Underwater acoustic ray tracing in Rust.
 
-## Features (current)
-- JSON input configuration input (see `examples/env_simple.json`)
-- HDF5 output of ray paths
-- 3D sound speed profiles with trilinear interpolation
-- Flat surface pressure release boundary
+## Current Features
+- 3D ray / beam tracing
+- Surface (vacuum) and bottom (rigid) reflections
+- 3D sound speed profiles
+- 2D bathymetry
+- Efficient wideband beam tracing using Gaussian beams
+- Python bindings via pyo3
+- IO with json and netCDF files respectively
+- Receiver representation for grids and arrays
 
-## Planned features
-- Acoustic Bottom reflections
-- 2D batyhmetry grid
-- Beam tracing and pressure calculation
+## Planned Features
+- Parallel procssing
+- More boundary conditions (fluid-fluid and fluid-elastic)
+- Absorption / losses (boundary and volume)
+- Alternate ray time based time domain formulation
 
 ## Usage
 
-Build:
-```
-cargo build
+Build with cargo:
+
+```bash
+cargo build --release
 ```
 
-Run with example:
+Build with python bindings:
 ```
-cargo run --release -- examples/env_simple.json
+maturin develop --release --features python
 ```
+
+Run with json input file:
+```bash
+cargo run --release <path_to_input_file>.json
+```
+
+see `examples/` for more usage details, specifically `examples/munk_test_pyo3.py` for python bindings usage.
 
