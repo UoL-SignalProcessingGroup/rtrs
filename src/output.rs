@@ -36,7 +36,7 @@ pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_pat
     pressure.new_dataset_builder().with_data(&simulation_config.source.freq_hz).create("frequency_hz")?;
     if pressure_field.is_array {
         // write explicit receiver positions as an (N,3) dataset
-        let recs = pressure_field.receiver_positions.as_ref().expect("receiver_positions present for array mode");
+        let recs = pressure_field.receiver_positions_m.as_ref().expect("receiver_positions_m present for array mode");
         let nrec = recs.len();
         let mut flat: Vec<f32> = Vec::with_capacity(nrec * 3);
         for r in recs.iter() { flat.push(r[0]); flat.push(r[1]); flat.push(r[2]); }

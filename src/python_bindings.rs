@@ -30,13 +30,13 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
     y_m: &'a Vec<f32>,
     z_m: &'a Vec<f32>,
     // for array-mode receivers, explicit positions (N x 3) will be returned instead
-    receiver_positions: Option<&'a Vec<[f32; 3]>>,
-        frequency_hz: &'a Vec<f32>,
-        shape: (usize, usize, usize, usize),
-        pressure_re: Vec<f32>,
-        pressure_im: Vec<f32>,
-        delay_s: Vec<f32>,
-        amplitude: Vec<f32>,
+    receiver_positions_m: Option<&'a Vec<[f32; 3]>>,
+    frequency_hz: &'a Vec<f32>,
+    shape: (usize, usize, usize, usize),
+    pressure_re: Vec<f32>,
+    pressure_im: Vec<f32>,
+    delay_s: Vec<f32>,
+    amplitude: Vec<f32>,
     }
 
     #[derive(serde::Serialize)]
@@ -77,7 +77,7 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
         x_m: &pressure_field.x_m,
         y_m: &pressure_field.y_m,
         z_m: &pressure_field.z_m,
-        receiver_positions: pressure_field.receiver_positions.as_ref(),
+        receiver_positions_m: pressure_field.receiver_positions_m.as_ref(),
         frequency_hz: &cfg.source.freq_hz,
         shape: (nfreq, nx, ny, nz),
         pressure_re: re_flat,

@@ -19,9 +19,9 @@ pub struct PressureField {
     pub x_m: Vec<f32>,
     pub y_m: Vec<f32>,
     pub z_m: Vec<f32>,
-    // when true, receivers are an explicit list of positions in `receiver_positions`
+    // when true, receivers are an explicit list of positions in `receiver_positions_m`
     pub is_array: bool,
-    pub receiver_positions: Option<Vec<[f32; 3]>>,
+    pub receiver_positions_m: Option<Vec<[f32; 3]>>,
     // per-receiver earliest arrival delay (s) and corresponding amplitude
     pub delay_s: Array3<f32>, // [x,y,z]
     pub amplitude: Array3<f32>, // [x,y,z]
@@ -39,7 +39,7 @@ pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
     let y_m: Vec<f32>;
     let z_m: Vec<f32>;
     let mut is_array = false;
-    let mut receiver_positions: Option<Vec<[f32; 3]>> = None;
+    let mut receiver_positions_m: Option<Vec<[f32; 3]>> = None;
     let pressure;
     let delay_s;
     let amplitude;
@@ -56,7 +56,7 @@ pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
         for i in 0..nrec {
             recs.push([config.receivers.x_rcvr_m[i], config.receivers.y_rcvr_m[i], config.receivers.z_rcvr_m[i]]);
         }
-        receiver_positions = Some(recs);
+        receiver_positions_m = Some(recs);
         is_array = true;
 
         // keep x_m/y_m/z_m empty placeholders for array mode
@@ -88,7 +88,7 @@ pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
         y_m,
         z_m,
         is_array,
-        receiver_positions,
+        receiver_positions_m,
         delay_s,
         amplitude,
     }
@@ -167,9 +167,9 @@ pub fn gaussian_beam_influence(
 
     // Process each receiver in the 3D grid
     // Iterate over ray segments first, then only visit receivers inside a per-segment AABB.
-    // If pressure_field.is_array, treat receivers as explicit list in receiver_positions
+    // If pressure_field.is_array, treat receivers as explicit list in receiver_positions_m
     if pressure_field.is_array {
-        let recs = pressure_field.receiver_positions.as_ref().expect("receiver_positions must be Some in array mode");
+        let recs = pressure_field.receiver_positions_m.as_ref().expect("receiver_positions_m must be Some in array mode");
         let nrec = recs.len();
 
         for is in 1..n_steps {
