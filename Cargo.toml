@@ -17,6 +17,7 @@ hdf5-metno = "0.10.1"
 ndarray = { version = "0.16.1", features = ["serde"] }
 num-complex = "0.4.6"
 pyo3 = { version = "0.18", optional = true, features = ["extension-module", "auto-initialize"] }
+rayon = "1.8"
 
 [features]
 python = ["pyo3"]

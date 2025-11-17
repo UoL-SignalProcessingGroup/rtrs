@@ -11,9 +11,9 @@ Underwater acoustic ray tracing in Rust.
 - Python bindings via pyo3
 - IO with json and netCDF files respectively
 - Receiver representation for grids and arrays
+- Parallel processing over the number of rays / beams with rayon
 
 ## Planned Features
-- Parallel procssing
 - More boundary conditions (fluid-fluid and fluid-elastic)
 - Absorption / losses (boundary and volume)
 - Alternate ray time based time domain formulation
@@ -36,5 +36,14 @@ Run with json input file:
 cargo run --release <path_to_input_file>.json
 ```
 
-see `examples/` for more usage details, specifically `examples/munk_test_pyo3.py` for python bindings usage.
+Install python bindings with maturin to a conda environment:
+```bash
+conda activate <your_env>
+maturin develop --release --features python
+```
+
+See `examples/` for more usage details, specifically `examples/munk_test_pyo3.py` for python bindings usage. 
+
+## License
+MIT License. See LICENSE file for details.
 

@@ -3,10 +3,8 @@ use crate::rays::trace_ray;
 use crate::ssp::init_ssp;
 use crate::bty;
 use crate::influence::{gaussian_beam_influence, init_pressure_field, PressureField};
+use rayon::prelude::*;
 use std::f32::consts::PI;
-use std::time::Instant;
-
-const TIMER: bool = false;
 
 pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
 
@@ -24,74 +22,59 @@ pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
         1.0_f32.to_radians()
     };
 
-    // allocate ray paths and pressure field
-    let mut ray_paths = Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len());
-
     // initialize environmental fields
     let ssp_field = init_ssp(cfg);
     let bty_field = bty::init_bty(cfg);
 
-    // allocate pressure field array
-    let mut pressure_field = init_pressure_field(cfg);
-
     // angular frequency
     let omega: Vec<f32> = cfg.source.freq_hz.iter().map(|f| 2.0 * PI * f).collect();
 
-    // timing containers (keep in outer scope so they're available after the loop)
-    let mut trace_durations: Vec<f32> = if TIMER { Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len()) } else { Vec::new() };
-    let mut influence_durations: Vec<f32> = if TIMER { Vec::with_capacity(launch_azim_rad.len() * launch_elev_rad.len()) } else { Vec::new() };
+    // Create all angle pairs upfront for parallel processing
+    let angle_pairs: Vec<(f32, f32)> = launch_azim_rad.iter()
+        .flat_map(|&azim| {
+            launch_elev_rad.iter().map(move |&elev| (azim, elev))
+        })
+        .collect();
     
-    // loop over launch angles
-    for &azim in &launch_azim_rad {
-        for &elev in &launch_elev_rad {
-
-            // run trace and influence; measure timings if enabled. Use a block expression
-            // so we can return the populated ray history and still keep timings in scope.
-            let ray_history = {
-                if TIMER {
-                    // trace rays (timed)
-                    let t0 = Instant::now();
-                    let mut rh = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
-                    let t_trace = t0.elapsed().as_secs_f32();
-                    trace_durations.push(t_trace);
-
-                    // beam influence (timed)
-                    let t1 = Instant::now();
-                    gaussian_beam_influence(&mut rh, &mut pressure_field, elev, d_azim, d_elev, &omega);
-                    let t_infl = t1.elapsed().as_secs_f32();
-                    influence_durations.push(t_infl);
-
-                    rh
-                } else {
-                    // no timing
-                    let mut rh = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
-                    gaussian_beam_influence(&mut rh, &mut pressure_field, elev, d_azim, d_elev, &omega);
-                    rh
-                }
-            };
-
-            // save ray path history for output
-            let path = ray_history.iter().map(|r| r.position).collect::<Vec<[f32; 3]>>();
-            ray_paths.push(path);
+    // Process rays in parallel - each thread gets its own local pressure field
+    let results: Vec<_> = angle_pairs
+        .par_iter()
+        .map(|&(azim, elev)| {
+            // Each thread initializes its own local pressure field
+            let mut local_pressure_field = init_pressure_field(cfg);
+            
+            // Trace ray and compute influence
+            let mut ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
+            gaussian_beam_influence(&mut ray_history, &mut local_pressure_field, 
+                                   elev, d_azim, d_elev, &omega);
+            
+            // Extract ray path
+            let path = ray_history.iter()
+                .map(|r| r.position)
+                .collect::<Vec<[f32; 3]>>();
+            
+            (path, local_pressure_field)
+        })
+        .collect();
+    
+    // Separate ray paths and local pressure fields
+    let (ray_paths, local_fields): (Vec<_>, Vec<_>) = results.into_iter().unzip();
+    
+    // Merge all local pressure fields into the final one
+    let mut pressure_field = init_pressure_field(cfg);
+    for local_field in local_fields {
+        // Element-wise addition of pressure arrays
+        pressure_field.pressure += &local_field.pressure;
+        
+        // Merge delay and amplitude: keep the earliest arrival with its amplitude
+        for idx in ndarray::indices(pressure_field.delay_s.raw_dim()) {
+            let local_delay = local_field.delay_s[idx];
+            if local_delay < pressure_field.delay_s[idx] {
+                pressure_field.delay_s[idx] = local_delay;
+                pressure_field.amplitude[idx] = local_field.amplitude[idx];
+            }
         }
     }
-
-    if TIMER {
-        // Print average timings
-        if !trace_durations.is_empty() {
-            let sum: f32 = trace_durations.iter().sum();
-            let avg = sum / (trace_durations.len() as f32);
-            println!("Average trace_ray time: {:.6} s over {} calls", avg, trace_durations.len());
-            println!("  (total time {:.3} s)", sum);
-        }
-        if !influence_durations.is_empty() {
-            let sum: f32 = influence_durations.iter().sum();
-            let avg = sum / (influence_durations.len() as f32);
-            println!("Average gaussian_beam_influence time: {:.6} s over {} calls", avg, influence_durations.len());
-            println!("  (total time {:.3} s)", sum);
-        }
-    }
-    
 
     return (ray_paths, pressure_field);
 }
