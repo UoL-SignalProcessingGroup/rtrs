@@ -34,9 +34,23 @@ pub fn write_hdf5(file_path: &str, simulation_config: &SimulationConfig, ray_pat
 
     let pressure = file.create_group("pressure_field")?;
     pressure.new_dataset_builder().with_data(&simulation_config.source.freq_hz).create("frequency_hz")?;
-    pressure.new_dataset_builder().with_data(&pressure_field.x_m).create("x_m")?;
-    pressure.new_dataset_builder().with_data(&pressure_field.y_m).create("y_m")?;
-    pressure.new_dataset_builder().with_data(&pressure_field.z_m).create("z_m")?;
+    if pressure_field.is_array {
+        // write explicit receiver positions as an (N,3) dataset
+        let recs = pressure_field.receiver_positions.as_ref().expect("receiver_positions present for array mode");
+        let nrec = recs.len();
+        let mut flat: Vec<f32> = Vec::with_capacity(nrec * 3);
+        for r in recs.iter() { flat.push(r[0]); flat.push(r[1]); flat.push(r[2]); }
+        let arr = ndarray::Array2::from_shape_vec((nrec, 3), flat)
+            .expect("failed to shape receiver positions");
+        pressure.new_dataset_builder().with_data(&arr).create("receiver_positions_m")?;
+    } else {
+        pressure.new_dataset_builder().with_data(&pressure_field.x_m).create("x_m")?;
+        pressure.new_dataset_builder().with_data(&pressure_field.y_m).create("y_m")?;
+            pressure.new_dataset_builder().with_data(&pressure_field.z_m).create("z_m")?;
+    }
+    // write per-receiver earliest arrival delay and amplitude
+    pressure.new_dataset_builder().with_data(&pressure_field.delay_s).create("delay_s")?;
+    pressure.new_dataset_builder().with_data(&pressure_field.amplitude).create("amplitude")?;
     
     // write complex pressure field as separate real and imaginary 3D datasets
     // pressure_field.pressure is an ndarray::Array4<num_complex::Complex32> with shape (nfreq, nx, ny, nz)

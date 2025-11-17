@@ -51,9 +51,15 @@ def load_cmpx_pressure(h5path):
     with h5py.File(h5path, 'r') as f:
         pressure_field = f['pressure_field']
         frequency_hz = pressure_field['frequency_hz'][:]
-        x_m = pressure_field['x_m'][:]
-        y_m = pressure_field['y_m'][:]
-        z_m = pressure_field['z_m'][:]
+        try:
+            x_m = pressure_field['x_m'][:]
+            y_m = pressure_field['y_m'][:]
+            z_m = pressure_field['z_m'][:]
+        except:
+            receiver_positions_m = pressure_field['receiver_positions_m'][:]
+            x_m = np.unique(receiver_positions_m[:, 0])
+            y_m = np.unique(receiver_positions_m[:, 1])
+            z_m = np.unique(receiver_positions_m[:, 2])
         pressure_im = pressure_field['pressure_im'][:]
         pressure_re = pressure_field['pressure_re'][:]
     return frequency_hz, x_m, y_m, z_m, pressure_re + 1j * pressure_im

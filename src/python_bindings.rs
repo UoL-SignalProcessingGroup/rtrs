@@ -26,13 +26,17 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
 
     #[derive(serde::Serialize)]
     struct PressureOut<'a> {
-        x_m: &'a Vec<f32>,
-        y_m: &'a Vec<f32>,
-        z_m: &'a Vec<f32>,
+    x_m: &'a Vec<f32>,
+    y_m: &'a Vec<f32>,
+    z_m: &'a Vec<f32>,
+    // for array-mode receivers, explicit positions (N x 3) will be returned instead
+    receiver_positions: Option<&'a Vec<[f32; 3]>>,
         frequency_hz: &'a Vec<f32>,
         shape: (usize, usize, usize, usize),
         pressure_re: Vec<f32>,
         pressure_im: Vec<f32>,
+        delay_s: Vec<f32>,
+        amplitude: Vec<f32>,
     }
 
     #[derive(serde::Serialize)]
@@ -45,6 +49,9 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
     let (nfreq, nx, ny, nz) = (shape.0, shape.1, shape.2, shape.3);
     let mut re_flat: Vec<f32> = Vec::with_capacity(nfreq * nx * ny * nz);
     let mut im_flat: Vec<f32> = Vec::with_capacity(nfreq * nx * ny * nz);
+    // flatten delay/amplitude 3D arrays
+    let mut delay_flat: Vec<f32> = Vec::with_capacity(nx * ny * nz);
+    let mut amp_flat: Vec<f32> = Vec::with_capacity(nx * ny * nz);
     for ifreq in 0..nfreq {
         for ix in 0..nx {
             for iy in 0..ny {
@@ -57,14 +64,26 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
         }
     }
 
+    for ix in 0..nx {
+        for iy in 0..ny {
+            for iz in 0..nz {
+                delay_flat.push(pressure_field.delay_s[(ix, iy, iz)]);
+                amp_flat.push(pressure_field.amplitude[(ix, iy, iz)]);
+            }
+        }
+    }
+
     let p_out = PressureOut{
         x_m: &pressure_field.x_m,
         y_m: &pressure_field.y_m,
         z_m: &pressure_field.z_m,
+        receiver_positions: pressure_field.receiver_positions.as_ref(),
         frequency_hz: &cfg.source.freq_hz,
         shape: (nfreq, nx, ny, nz),
         pressure_re: re_flat,
         pressure_im: im_flat,
+        delay_s: delay_flat,
+        amplitude: amp_flat,
     };
 
     let out = Out { ray_paths: &ray_paths, pressure_field: p_out };

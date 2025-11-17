@@ -7,7 +7,7 @@ use crate::utils::{
 };
 
 use std::f32::consts::PI;
-use ndarray::Array4;
+use ndarray::{Array4, Array3};
 use num_complex::Complex32;
 use std::cmp::Ordering;
 
@@ -19,17 +19,67 @@ pub struct PressureField {
     pub x_m: Vec<f32>,
     pub y_m: Vec<f32>,
     pub z_m: Vec<f32>,
+    // when true, receivers are an explicit list of positions in `receiver_positions`
+    pub is_array: bool,
+    pub receiver_positions: Option<Vec<[f32; 3]>>,
+    // per-receiver earliest arrival delay (s) and corresponding amplitude
+    pub delay_s: Array3<f32>, // [x,y,z]
+    pub amplitude: Array3<f32>, // [x,y,z]
 }
 
 pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
 
     // initialize empty pressure field
-    let x_m = config.receivers.x_rcvr_m.clone();
-    let y_m = config.receivers.y_rcvr_m.clone();
-    let z_m = config.receivers.z_rcvr_m.clone();
     let nfreq = config.source.freq_hz.len();
-    let shape = (nfreq, x_m.len(), y_m.len(), z_m.len());
-    let pressure = Array4::<Complex32>::zeros(shape);
+
+    // support two receiver configuration modes:
+    // - "grid" (default): x_rcvr_m/y_rcvr_m/z_rcvr_m are axes -> produce 4D grid (nx,ny,nz)
+    // - "array": x_rcvr_m/y_rcvr_m/z_rcvr_m are explicit per-receiver positions of equal length
+    let x_m: Vec<f32>;
+    let y_m: Vec<f32>;
+    let z_m: Vec<f32>;
+    let mut is_array = false;
+    let mut receiver_positions: Option<Vec<[f32; 3]>> = None;
+    let pressure;
+    let delay_s;
+    let amplitude;
+
+    if config.receivers.config_type.to_lowercase() == "array" {
+        // validate lengths match
+        let nx = config.receivers.x_rcvr_m.len();
+        let ny = config.receivers.y_rcvr_m.len();
+        let nz = config.receivers.z_rcvr_m.len();
+        assert!(nx == ny && ny == nz, "array receiver coordinates must have equal lengths");
+        let nrec = nx;
+        // create receiver positions vector
+        let mut recs: Vec<[f32; 3]> = Vec::with_capacity(nrec);
+        for i in 0..nrec {
+            recs.push([config.receivers.x_rcvr_m[i], config.receivers.y_rcvr_m[i], config.receivers.z_rcvr_m[i]]);
+        }
+        receiver_positions = Some(recs);
+        is_array = true;
+
+        // keep x_m/y_m/z_m empty placeholders for array mode
+        x_m = Vec::new(); y_m = Vec::new(); z_m = Vec::new();
+
+        let shape = (nfreq, nrec, 1usize, 1usize);
+        pressure = Array4::<Complex32>::zeros(shape);
+        delay_s = Array3::<f32>::from_elem((nrec, 1, 1), f32::INFINITY);
+        amplitude = Array3::<f32>::from_elem((nrec, 1, 1), 0.0_f32);
+    } else {
+        // grid mode (existing behavior)
+        x_m = config.receivers.x_rcvr_m.clone();
+        y_m = config.receivers.y_rcvr_m.clone();
+        z_m = config.receivers.z_rcvr_m.clone();
+        let shape = (nfreq, x_m.len(), y_m.len(), z_m.len());
+        pressure = Array4::<Complex32>::zeros(shape);
+        // per-receiver arrays (nx, ny, nz)
+        let nx = x_m.len();
+        let ny = y_m.len();
+        let nz = z_m.len();
+        delay_s = Array3::<f32>::from_elem((nx, ny, nz), f32::INFINITY);
+        amplitude = Array3::<f32>::from_elem((nx, ny, nz), 0.0_f32);
+    }
 
     // init struct 
     PressureField {
@@ -37,6 +87,10 @@ pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
         x_m,
         y_m,
         z_m,
+        is_array,
+        receiver_positions,
+        delay_s,
+        amplitude,
     }
 }
 
@@ -113,6 +167,115 @@ pub fn gaussian_beam_influence(
 
     // Process each receiver in the 3D grid
     // Iterate over ray segments first, then only visit receivers inside a per-segment AABB.
+    // If pressure_field.is_array, treat receivers as explicit list in receiver_positions
+    if pressure_field.is_array {
+        let recs = pressure_field.receiver_positions.as_ref().expect("receiver_positions must be Some in array mode");
+        let nrec = recs.len();
+
+        for is in 1..n_steps {
+            // Precompute per-segment values
+            let ray_start = ray_history[is - 1].position;
+            let ray_end = ray_history[is].position;
+            let ray_vec = sub(&ray_end, &ray_start);
+            let ray_length_sq = dot(&ray_vec, &ray_vec);
+            if ray_length_sq < 1e-12 { continue; }
+            let seg_len = ray_length_sq.sqrt();
+            if seg_len <= 1e-4 { continue; }
+
+            // beam radius estimate (use precomputed maxima)
+            let mut beam_radius = 0.0_f32;
+            if is - 1 < max_radius_a.len() && is - 1 < max_radius_b.len() {
+                beam_radius = max_radius_a[is - 1].max(max_radius_b[is - 1]);
+            }
+            let half_len = 0.5 * seg_len;
+            let search_radius = beam_radius + half_len + 1e-6_f32;
+
+            // Use precomputed normals
+            let e1 = e1_g[is];
+            let e2 = e2_g[is];
+
+            for irec in 0..nrec {
+                let receiver_pos = recs[irec];
+
+                // Find closest point on ray segment to receiver
+                let to_receiver = sub(&receiver_pos, &ray_start);
+                let t_raw = dot(&to_receiver, &ray_vec) / ray_length_sq;
+                if t_raw < 0.0 || t_raw > 1.0 { continue; }
+                let t = t_raw;
+                let closest_point = [
+                    ray_start[0] + t * ray_vec[0],
+                    ray_start[1] + t * ray_vec[1],
+                    ray_start[2] + t * ray_vec[2],
+                ];
+
+                let dx = receiver_pos[0] - closest_point[0];
+                let dy = receiver_pos[1] - closest_point[1];
+                let dz = receiver_pos[2] - closest_point[2];
+                let dist_sq = dx*dx + dy*dy + dz*dz;
+                if dist_sq > (search_radius * search_radius) { continue; }
+
+                // Linear interpolation of q's at closest point
+                let q_tilde = [
+                    ray_history[is - 1].q_tilde[0] + t * (ray_history[is].q_tilde[0] - ray_history[is - 1].q_tilde[0]),
+                    ray_history[is - 1].q_tilde[1] + t * (ray_history[is].q_tilde[1] - ray_history[is - 1].q_tilde[1]),
+                ];
+                let q_hat = [
+                    ray_history[is - 1].q_hat[0] + t * (ray_history[is].q_hat[0] - ray_history[is - 1].q_hat[0]),
+                    ray_history[is - 1].q_hat[1] + t * (ray_history[is].q_hat[1] - ray_history[is - 1].q_hat[1]),
+                ];
+
+                let det_q_int = q_tilde[0] * q_hat[1] - q_hat[0] * q_tilde[1];
+                if det_q_int.abs() < 1e-12 { continue; }
+
+                let offset = sub(&receiver_pos, &closest_point);
+                let n = dot(&offset, &e1).abs();
+                let m = dot(&offset, &e2).abs();
+
+                let a = if q_hat[1].abs() > 1e-12 {
+                    ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs()
+                } else {
+                    (m / det_q_int.abs()).abs()
+                };
+                let b = if q_tilde[0].abs() > 1e-12 {
+                    ((q_tilde[0] * m - q_tilde[1] * n) / det_q_int).abs()
+                } else {
+                    (n / det_q_int.abs()).abs()
+                };
+
+                if a + b > beam_window { continue; }
+                let w = (-0.5_f32 * (a * a + b * b)).exp();
+                let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
+                let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
+                let amp = const_amp * w;
+
+                let mut phase_int = ray_history[is - 1].phase + kmah_phase[is - 1];
+                let det_q_prev = ray_history[is - 1].det_q;
+                if (det_q_int <= 0.0 && det_q_prev > 0.0) || (det_q_int >= 0.0 && det_q_prev < 0.0) {
+                    phase_int += PI / 2.0;
+                }
+
+                // update earliest arrival for this receiver index
+                {
+                    let cur_delay = pressure_field.delay_s[(irec, 0, 0)];
+                    let cur_amp = pressure_field.amplitude[(irec, 0, 0)];
+                    if delay < cur_delay || (delay == cur_delay && amp.abs() > cur_amp.abs()) {
+                        pressure_field.delay_s[(irec, 0, 0)] = delay;
+                        pressure_field.amplitude[(irec, 0, 0)] = amp;
+                    }
+                }
+
+                // accumulate pressure for each frequency into (nfreq, irec, 0, 0)
+                for (ifreq, &om) in omega.iter().enumerate() {
+                    let phase = om * delay - phase_int;
+                    let (s, c) = phase.sin_cos();
+                    let contribution = Complex32::new(amp * c, amp * s);
+                    pressure_field.pressure[[ifreq, irec, 0, 0]] += contribution;
+                }
+            }
+        }
+
+        return; // finished array-mode processing
+    }
     let find_index_range = |arr: &Vec<f32>, min_v: f32, max_v: f32| -> Option<(usize, usize)> {
         if min_v > max_v { return None; }
         // lower bound
@@ -245,6 +408,18 @@ pub fn gaussian_beam_influence(
                         phase_int += PI / 2.0;
                     }
 
+                    // Record per-receiver earliest-arrival delay and corresponding amplitude
+                    // If this contribution arrives earlier than stored delay, replace; if equal delay, keep larger amplitude
+                    {
+                        let cur_delay = pressure_field.delay_s[(ix, iy, iz)];
+                        let cur_amp = pressure_field.amplitude[(ix, iy, iz)];
+                        // choose update when delay is smaller (earlier) or if equal delay but amplitude larger
+                        if delay < cur_delay || (delay == cur_delay && amp.abs() > cur_amp.abs()) {
+                            pressure_field.delay_s[(ix, iy, iz)] = delay;
+                            pressure_field.amplitude[(ix, iy, iz)] = amp;
+                        }
+                    }
+
                     // Loop over frequencies and accumulate into 4D pressure field
                     for (ifreq, &om) in omega.iter().enumerate() {
                         let phase = om * delay - phase_int;
@@ -257,171 +432,3 @@ pub fn gaussian_beam_influence(
         }
     }
 }
-
-
-
-
-// old
-// pub fn hat_beam_influence(
-//     ray_history: &mut Vec<Ray>, 
-//     pressure_field: &mut PressureField,
-//     elev: f32,
-//     d_azim: f32,
-//     d_elev: f32,
-//     omega: f32
-// ) {
-//     let n_steps = ray_history.len();
-//     if n_steps < 2 { return; }
-
-//     // Scale the beam
-//     scale_beam(elev, d_elev, d_azim, ray_history);
-    
-//     // Calculate KMAH phase shifts at caustics
-//     let mut kmah_phase = vec![0.0; n_steps];
-//     for is in 1..n_steps {
-//         kmah_phase[is] = kmah_phase[is - 1];
-//         let det_q_curr = ray_history[is].det_q;
-//         let det_q_prev = ray_history[is - 1].det_q;
-        
-//         if (det_q_curr <= 0.0 && det_q_prev > 0.0) || (det_q_curr >= 0.0 && det_q_prev < 0.0) {
-//             kmah_phase[is] = kmah_phase[is - 1] + PI / 2.0;
-//         }
-//     }
-
-//     // Pre-calculate tangents and normals for each ray step
-//     let mut e1_g = vec![[0.0; 3]; n_steps];
-//     let mut e2_g = vec![[0.0; 3]; n_steps];
-    
-//     for is in 0..n_steps {
-//         let ray = &ray_history[is];
-//         (e1_g[is], e2_g[is]) = crate::rays::ray_normal(ray.direction, ray.phi, ray.c);
-//     }
-
-//     // Process each receiver in the 3D grid
-//     for (ix, &x_rcvr) in pressure_field.x_m.iter().enumerate() {
-//         for (iy, &y_rcvr) in pressure_field.y_m.iter().enumerate() {
-//             for (iz, &z_rcvr) in pressure_field.z_m.iter().enumerate() {
-                
-//                 // Vector from receiver to each ray step
-//                 let mut xt = vec![[0.0; 3]; n_steps];
-//                 for is in 0..n_steps {
-//                     xt[is] = [
-//                         ray_history[is].position[0] - x_rcvr,
-//                         ray_history[is].position[1] - y_rcvr,
-//                         ray_history[is].position[2] - z_rcvr,
-//                     ];
-//                 }
-
-//                 // Cross products for each step
-//                 let mut xtxe1 = vec![[0.0; 3]; n_steps];
-//                 let mut xtxe2 = vec![[0.0; 3]; n_steps];
-//                 for is in 0..n_steps {
-//                     xtxe1[is] = cross_product(&xt[is], &e1_g[is]);
-//                     xtxe2[is] = cross_product(&xt[is], &e2_g[is]);
-//                 }
-
-//                 // Step through the ray
-//                 for is in 1..n_steps {
-//                     // Skip duplicate points (boundary reflections)
-//                     let ray_segment_length = norm(&sub(&ray_history[is].position, &ray_history[is - 1].position));
-//                     if ray_segment_length <= 1e-4 {
-//                         continue;
-//                     }
-
-//                     // Check if the ray passes close to this receiver
-//                     let ray_start = ray_history[is - 1].position;
-//                     let ray_end = ray_history[is].position;
-//                     let receiver_pos = [x_rcvr, y_rcvr, z_rcvr];
-                    
-//                     // Find closest point on ray segment to receiver
-//                     let ray_vec = sub(&ray_end, &ray_start);
-//                     let to_receiver = sub(&receiver_pos, &ray_start);
-//                     let ray_length_sq = dot(&ray_vec, &ray_vec);
-                    
-//                     if ray_length_sq < 1e-12 { continue; } // Degenerate segment
-                    
-//                     let t = dot(&to_receiver, &ray_vec) / ray_length_sq;
-//                     let t = t.max(0.0).min(1.0); // Clamp to segment
-                    
-//                     // Closest point on ray segment
-//                     let closest_point = [
-//                         ray_start[0] + t * ray_vec[0],
-//                         ray_start[1] + t * ray_vec[1],
-//                         ray_start[2] + t * ray_vec[2],
-//                     ];
-                    
-//                     // Distance from receiver to ray
-//                     let dist_to_ray = norm(&sub(&receiver_pos, &closest_point));
-                    
-//                     // Only process if receiver is within reasonable distance
-//                     // (this is a simplified beam width check)
-//                     if dist_to_ray > 100.0 { continue; } // 100m beam width for now
-                    
-//                     // Linear interpolation of ray properties at closest point
-//                     let q_tilde = [
-//                         ray_history[is - 1].q_tilde[0] + t * (ray_history[is].q_tilde[0] - ray_history[is - 1].q_tilde[0]),
-//                         ray_history[is - 1].q_tilde[1] + t * (ray_history[is].q_tilde[1] - ray_history[is - 1].q_tilde[1]),
-//                     ];
-//                     let q_hat = [
-//                         ray_history[is - 1].q_hat[0] + t * (ray_history[is].q_hat[0] - ray_history[is - 1].q_hat[0]),
-//                         ray_history[is - 1].q_hat[1] + t * (ray_history[is].q_hat[1] - ray_history[is - 1].q_hat[1]),
-//                     ];
-                    
-//                     // Determinant of the ray tube
-//                     let det_q_int = q_tilde[0] * q_hat[1] - q_hat[0] * q_tilde[1];
-//                     if det_q_int.abs() < 1e-12 {
-//                         continue; // Receiver outside beam or degenerate beam
-//                     }
-                    
-//                     // Calculate beam coordinates
-//                     // Project distance onto the two beam directions
-//                     let (e1, e2) = crate::rays::ray_normal(ray_history[is].direction, ray_history[is].phi, ray_history[is].c);
-//                     let offset = sub(&receiver_pos, &closest_point);
-//                     let m = dot(&offset, &e1).abs();
-//                     let n = dot(&offset, &e2).abs();
-
-//                     // Beam coordinates in paraxial system
-//                     let a = if q_hat[1].abs() > 1e-12 { 
-//                         ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs() 
-//                     } else { 
-//                         (m / det_q_int.abs()).abs() 
-//                     };
-//                     let b = if q_tilde[0].abs() > 1e-12 { 
-//                         ((q_tilde[0] * m - q_tilde[1] * n) / det_q_int).abs() 
-//                     } else { 
-//                         (n / det_q_int.abs()).abs() 
-//                     };
-                    
-//                     if a.max(b) > 1.0 {
-//                         continue; // Receiver outside beam
-//                     }
-
-//                     // Hat function beam pattern
-//                     let w = (1.0 - a) * (1.0 - b);
-                    
-//                     // Travel time to closest point
-//                     let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
-
-//                     let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
-//                     let amp = const_amp * w;
-
-//                     // Phase shift at caustics
-//                     let mut phase_int = ray_history[is - 1].phase + kmah_phase[is - 1];
-//                     let det_q_prev = ray_history[is - 1].det_q;
-//                     if (det_q_int <= 0.0 && det_q_prev > 0.0) || (det_q_int >= 0.0 && det_q_prev < 0.0) {
-//                         phase_int += PI / 2.0;
-//                     }
-
-//                     // Apply coherent contribution
-//                     let phase = omega * delay - phase_int;
-//                     let contribution = Complex32::new(
-//                         amp * phase.cos(),
-//                         amp * phase.sin()
-//                     );
-
-//                     pressure_field.pressure[[ix, iy, iz]] += contribution;
-//                 }
-//             }
-//         }
-//     }
-// }

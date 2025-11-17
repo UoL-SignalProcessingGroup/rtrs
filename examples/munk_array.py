@@ -37,11 +37,11 @@ env_m = {
         "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
-        "config_type": "grid",
-        "x_rcvr_m": [0.0],
+        "config_type": "array",
+        "x_rcvr_m": np.full(500, 0.0).tolist(),
         "y_rcvr_m": np.linspace(0.0, 50000.0, 500).tolist(),
         # "z_rcvr_m": [1000.0] 
-        "z_rcvr_m": np.linspace(0.0, 5000.0, 500).tolist()
+        "z_rcvr_m": np.full(500, 1000.0).tolist()
     },
     "beam": {
         "step_m": 10.0,

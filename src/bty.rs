@@ -5,9 +5,9 @@ pub struct BTYfield {
     pub x: Vec<f32>,
     pub y: Vec<f32>,
     pub z: Array2<f32>,
-    pub density: f32,
-    pub c: f32,
-    pub atten: f32, // attenuation (nepers per meter for pressure amplitude)
+    // pub density: f32,
+    // pub c: f32,
+    // pub atten: f32, // attenuation (nepers per meter for pressure amplitude)
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
@@ -37,9 +37,9 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
         x: confg.bathymetry.x_bty_m.clone(),
         y: confg.bathymetry.y_bty_m.clone(),
         z: z_bty,
-        density: confg.bathymetry.density_g_cm3, 
-        c: confg.bathymetry.c_bty_m_s, 
-        atten: confg.bathymetry.attenuation_db * std::f32::consts::LN_10 / 20.0,
+        // density: confg.bathymetry.density_g_cm3, 
+        // c: confg.bathymetry.c_bty_m_s, 
+        // atten: confg.bathymetry.attenuation_db * std::f32::consts::LN_10 / 20.0,
     };
 
     return bty_field;
