@@ -3,7 +3,6 @@ use crate::rays::{Ray};
 use crate::utils::{
     dot,
     sub,
-    
 };
 
 use std::f32::consts::PI;

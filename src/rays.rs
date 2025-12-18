@@ -75,12 +75,15 @@ pub fn trace_ray(
         // check for boundary reflections (unified handler)
         reflect_boundaries(&mut ray_history, bty_field);
 
-        // check for termination conditions
+        // check for max range termination conditions
         if check_max_range(&mut ray_history, config.beam.max_range_m, config.source.position) {
             break;
         }
         
-        
+        // check for number of bottom bounces
+        if ray_history.last().unwrap().num_bottom_bounces >= 10 {
+            break;
+        }
     }
 
     return ray_history;

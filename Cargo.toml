@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 # [profile.release]
+# debug = true
 # lto = "fat"        # "thin" or "fat" 
 # codegen-units = 1   # best throughput; slower compile
 # opt-level = 3       # or "z"/"s" for size-first

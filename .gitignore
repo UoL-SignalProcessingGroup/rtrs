@@ -10,3 +10,6 @@ examples/*.json
 examples/__pycache__
 
 examples/wavs/*
+
+flamegraph.svg
+cargo-flamegraph.trace
