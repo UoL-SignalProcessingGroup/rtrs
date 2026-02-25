@@ -70,7 +70,6 @@ pub fn trace_ray(
 
         // perform Euler step
         euler_step_ray(&mut ray_history, config.beam.step_m, step, ssp_field);
-        // adaptive_heun_euler_step_ray(&mut ray_history, config.beam.step_m, step, ssp_field);
 
         // check for boundary reflections (unified handler)
         reflect_boundaries(&mut ray_history, bty_field);
@@ -171,11 +170,6 @@ fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f32, step: usize, ssp: &SSPFie
     ray_history.push(ray1);
 
 }
-
-
-// fn adaptive_heun_euler_step_ray(ray_history: &mut Vec<Ray>, ds: f32, step: usize, ssp: &SSPFields) {
-    
-// }
 
 
 pub fn ray_normal(direction: [f32; 3], phi: f32, c: f32) -> ([f32; 3], [f32; 3]) {

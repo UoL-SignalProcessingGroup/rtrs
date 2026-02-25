@@ -35,7 +35,7 @@ env_m = {
         "attenuation_db": 0.0
     },
     "source": {
-        "position": [0.0, 0.0, 1000.0],
+        "position": [0.0, 0.0, -1000.0],
         "freq_hz": [50.0],
         # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
         "launch_elev_deg": np.linspace(-20.0, 20.0, 200).tolist(),

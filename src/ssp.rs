@@ -38,7 +38,7 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
         1.0
     };
     let dy = if y.len() >= 2 {
-        y[1] - y[0] - y[0]
+        y[1] - y[0]
     } else {
         1.0
     };

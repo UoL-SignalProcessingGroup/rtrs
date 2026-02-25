@@ -1,3 +1,5 @@
+#![allow(unsafe_op_in_unsafe_fn)]
+
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
@@ -19,8 +21,21 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
         .extract()
         .map_err(|e| PyRuntimeError::new_err(format!("extract json string failed: {}", e)))?;
 
-    let cfg: SimulationConfig = serde_json::from_str(&json_str)
+    let mut cfg: SimulationConfig = serde_json::from_str(&json_str)
         .map_err(|e| PyRuntimeError::new_err(format!("failed to parse config JSON: {}", e)))?;
+
+    let warnings = cfg.validate()
+        .map_err(|e| PyRuntimeError::new_err(format!("invalid simulation config: {}", e)))?;
+
+    // Surface validation warnings as Python warnings so they are visible regardless of environment
+    if !warnings.is_empty() {
+        let warnings_mod = py.import("warnings")
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to import warnings: {}", e)))?;
+        for w in &warnings {
+            warnings_mod.call_method1("warn", (format!("rtrs: {}", w),))
+                .map_err(|e| PyRuntimeError::new_err(format!("warnings.warn failed: {}", e)))?;
+        }
+    }
 
     let (ray_paths, pressure_field) = engine::core(&cfg);
 

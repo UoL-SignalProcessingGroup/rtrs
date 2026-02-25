@@ -11,7 +11,7 @@ pub mod config {
     }
 
     impl SoundSpeed {
-        fn validate(&mut self, errors: &mut Vec<String>) {
+        fn validate(&mut self, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
             if self.c_m_s.is_empty() {
                 errors.push("ssp: c_m_s must not be empty".into());
             }
@@ -19,7 +19,7 @@ pub mod config {
                 errors.push("ssp: all sound speeds must be positive".into());
             }
             for z in self.z_ssp_m.iter_mut().filter(|z| **z < 0.0) {
-                eprintln!("WARNING ssp: z_ssp_m value {} is negative (positive down convention); correcting to {}", *z, z.abs());
+                warnings.push(format!("ssp: z_ssp_m value {} is negative (positive down convention); correcting to {}", *z, z.abs()));
                 *z = z.abs();
             }
         }
@@ -37,7 +37,7 @@ pub mod config {
     }
 
     impl Bathymetry {
-        fn validate(&self, errors: &mut Vec<String>) {
+        fn validate(&self, errors: &mut Vec<String>, _warnings: &mut Vec<String>) {
             if self.z_bty_m.is_empty() {
                 errors.push("bathymetry: z_bty_m must not be empty".into());
             }
@@ -53,13 +53,13 @@ pub mod config {
     }
 
     impl Source {
-        fn validate(&mut self, errors: &mut Vec<String>) {
+        fn validate(&mut self, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
             if self.position[2] < 0.0 {
-                eprintln!(
-                    "WARNING source: z position {} is negative (positive down convention); correcting to {}",
+                warnings.push(format!(
+                    "source: z position {} is negative (positive down convention); correcting to {}",
                     self.position[2],
                     self.position[2].abs()
-                );
+                ));
                 self.position[2] = self.position[2].abs();
             }
             if self.launch_elev_deg.iter().any(|&a| a < -90.0 || a > 90.0) {
@@ -79,7 +79,7 @@ pub mod config {
     }
 
     impl Receivers {
-        fn validate(&mut self, errors: &mut Vec<String>) {
+        fn validate(&mut self, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
             if self.config_type != "grid" && self.config_type != "array" {
                 errors.push(format!(
                     "receivers: config_type must be \"grid\" or \"array\", got \"{}\"",
@@ -87,7 +87,7 @@ pub mod config {
                 ));
             }
             for z in self.z_rcvr_m.iter_mut().filter(|z| **z < 0.0) {
-                eprintln!("WARNING receivers: z_rcvr_m value {} is negative (positive down convention); correcting to {}", *z, z.abs());
+                warnings.push(format!("receivers: z_rcvr_m value {} is negative (positive down convention); correcting to {}", *z, z.abs()));
                 *z = z.abs();
             }
         }
@@ -101,7 +101,7 @@ pub mod config {
     }
 
     impl BeamSettings {
-        fn validate(&self, errors: &mut Vec<String>) {
+        fn validate(&self, errors: &mut Vec<String>, _warnings: &mut Vec<String>) {
             if self.step_m <= 0.0 {
                 errors.push("beam: step_m must be positive".into());
             }
@@ -124,15 +124,16 @@ pub mod config {
     }
 
     impl SimulationConfig {
-        pub fn validate(&mut self) -> Result<()> {
+        pub fn validate(&mut self) -> Result<Vec<String>> {
             let mut errors: Vec<String> = Vec::new();
-            self.ssp.validate(&mut errors);
-            self.bathymetry.validate(&mut errors);
-            self.source.validate(&mut errors);
-            self.receivers.validate(&mut errors);
-            self.beam.validate(&mut errors);
+            let mut warnings: Vec<String> = Vec::new();
+            self.ssp.validate(&mut errors, &mut warnings);
+            self.bathymetry.validate(&mut errors, &mut warnings);
+            self.source.validate(&mut errors, &mut warnings);
+            self.receivers.validate(&mut errors, &mut warnings);
+            self.beam.validate(&mut errors, &mut warnings);
             if errors.is_empty() {
-                Ok(())
+                Ok(warnings)
             } else {
                 bail!("Invalid simulation config:\n  - {}", errors.join("\n  - "))
             }

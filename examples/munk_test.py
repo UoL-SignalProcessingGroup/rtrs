@@ -3,6 +3,7 @@ import os
 import json
 import python_utils
 import matplotlib.pyplot as plt
+import time 
 
 z = np.linspace(0.0, 5000.0, 50)
 munk_ssp = python_utils.munk(z)
@@ -57,7 +58,10 @@ env_m = {
 with open(jsonfile, "w") as f:
     json.dump(env_m, f, indent=2)
 
+t0 = time.time()
 os.system(f"cargo run --release  {jsonfile}")
+t1 = time.time()
+print(f"completed in {t1 - t0:.2f} seconds.")
 
 rays = python_utils.load_rays(outfile)
 x_bty, y_bty, z_bty = python_utils.load_bty(outfile)

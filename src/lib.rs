@@ -1,16 +1,8 @@
 #![allow(dead_code)]
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::PyAny;
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyRuntimeError;
-
 // declare crate modules at library root so both the CLI (main.rs) and the python
 // extension see the same module tree
 mod input;
-mod output;
 mod rays;
 mod ssp;
 mod bty;
