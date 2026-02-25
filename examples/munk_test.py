@@ -33,7 +33,7 @@ env_m = {
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
-        "freq_hz": [50.0],
+        "freq_hz": [5000.0],
         # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
         "launch_elev_deg": np.linspace(-20.0, 20.0, 500).tolist(),
         # "launch_elev_deg": [0.0],

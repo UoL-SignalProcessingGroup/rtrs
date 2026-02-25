@@ -38,8 +38,8 @@ env_m = {
     "source": {
         "position": [0.0, 0.0, 1000.0],
         "freq_hz": [50.0],
-        "launch_elev_deg": np.linspace(-20.0, 2.0, 100).tolist(),
-        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
+        "launch_elev_deg": np.linspace(-70.0, 70.0, 139).tolist(),
+        "launch_azim_deg": np.linspace(-1.0, 1.0, 5).tolist()
     },
     "receivers": {
         "config_type": "grid",
@@ -53,6 +53,9 @@ env_m = {
         "max_range_m": 50000.0
     }
 }
+
+print(f"launch elev deg: {env_m['source']['launch_elev_deg']}")
+print(f"launch azim deg: {env_m['source']['launch_azim_deg']}")
 
 # Call the Rust engine via PyO3 binding
 result = rtrs.run_simulation(env_m)
