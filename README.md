@@ -4,19 +4,19 @@ Underwater acoustic ray tracing in Rust.
 
 ## Current Features
 - 3D ray / beam tracing
-- Surface (vacuum) and bottom (rigid) reflections
+- Surface (vacuum) and bottom (rigid, lossless acoustic) reflections
 - 3D sound speed profiles
 - 2D bathymetry
-- Efficient wideband beam tracing using Gaussian beams
+- Efficient wideband beam tracing using Gaussian beams ()
 - Python bindings via pyo3
-- IO with json and netCDF files respectively
+- IO with json files
 - Receiver representation for grids and arrays
 - Parallel processing over the number of rays / beams with rayon
 
 ## Planned Features
 - More boundary conditions (fluid-fluid and fluid-elastic)
-- Absorption / losses (boundary and volume)
-- Alternate ray time based time domain formulation
+- Low frequency correction
+- Performance improvements
 
 ## Usage
 
