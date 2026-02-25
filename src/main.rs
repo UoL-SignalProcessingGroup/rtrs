@@ -16,7 +16,8 @@ use output::write_json;
 
 fn load_config(path: &str) -> Result<SimulationConfig> {
     let text = fs::read_to_string(path)?;
-    let cfg: SimulationConfig = serde_json::from_str(&text)?;
+    let mut cfg: SimulationConfig = serde_json::from_str(&text)?;
+    cfg.validate()?;
     Ok(cfg)
 }
 

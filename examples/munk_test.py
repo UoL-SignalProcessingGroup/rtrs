@@ -11,6 +11,9 @@ munk_ssp_3d_flat = munk_ssp_3d.flatten(order='C')
 name = "testm"
 jsonfile = f"examples/{name}.json"
 outfile = f"examples/{name}.out.json"
+# remove outfile if present
+if os.path.exists(outfile):
+    os.remove(outfile)
 
 env_m = {
     "ssp": {

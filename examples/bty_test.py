@@ -11,11 +11,14 @@ ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 name = "testbty"
 jsonfile = f"examples/{name}.json"
 outfile = f"examples/{name}.out.json"
+# remove outfile if present
+if os.path.exists(outfile):
+    os.remove(outfile)
 
 # Create bathymetry (bty) array: at x=0, z=1000; at x=5000, z=0
 x_bty = np.array([0.0, 50000.0])
 y_bty = np.array([0.0, 50000.0])
-z_bty = np.array([[1000.0, 0.0], [1000.0, 0.0]])  # shape (2,2): constant along y
+z_bty = np.array([[1000.0, -100.0], [1000.0, -100.0]])  # shape (2,2): constant along y
 
 # Flatten z_bty in row-major order
 z_bty_flat = z_bty.flatten(order='C')

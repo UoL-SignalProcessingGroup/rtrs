@@ -142,6 +142,9 @@ ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 
 jsonfile = "examples/testbb.json"
 outfile = "examples/testbb.out.json"
+# remove outfile if present
+if os.path.exists(outfile):
+    os.remove(outfile)
 
 
 env_bbp = {
@@ -200,6 +203,7 @@ env_bbm = {
         "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
+        "config_type": "grid",
         "x_rcvr_m": [0.0],
         "y_rcvr_m": [50000.0],
         "z_rcvr_m": [1000.0]

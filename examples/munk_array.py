@@ -8,9 +8,12 @@ z = np.linspace(0.0, 5000.0, 50)
 munk_ssp = python_utils.munk(z)
 munk_ssp_3d = np.tile(munk_ssp, (2, 2, 1))
 munk_ssp_3d_flat = munk_ssp_3d.flatten(order='C')
-name = "testm"
+name = "testm_array"
 jsonfile = f"examples/{name}.json"
 outfile = f"examples/{name}.out.json"
+# remove outfile if present
+if os.path.exists(outfile):
+    os.remove(outfile)
 
 env_m = {
     "ssp": {

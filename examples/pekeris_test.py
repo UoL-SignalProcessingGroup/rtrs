@@ -11,6 +11,9 @@ ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 name = "testp"
 jsonfile = f"examples/{name}.json"
 outfile = f"examples/{name}.out.json"
+# remove outfile if present
+if os.path.exists(outfile):
+    os.remove(outfile)
 
 env_p = {
     "ssp": {
@@ -31,7 +34,7 @@ env_p = {
     "source": {
         "position": [0.0, 0.0, 25.0],
         "freq_hz": [500.0],
-        "launch_elev_deg": np.linspace(-15.0, 15.0, 400).tolist(),
+        "launch_elev_deg": np.linspace(-5.0, 5.0, 400).tolist(),
         "launch_azim_deg": [-0.05, 0.0, 0.05]
     },
     "receivers": {
