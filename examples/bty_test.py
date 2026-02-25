@@ -10,7 +10,7 @@ ssp_pekeris_3d = np.tile(ssp_pekeris, (2, 2, 1))
 ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 name = "testbty"
 jsonfile = f"examples/{name}.json"
-h5file = f"examples/{name}.h5"
+outfile = f"examples/{name}.out.json"
 
 # Create bathymetry (bty) array: at x=0, z=1000; at x=5000, z=0
 x_bty = np.array([0.0, 50000.0])
@@ -44,6 +44,7 @@ env_bty = {
         "launch_azim_deg": np.linspace(30.0, 150.0, 5).tolist()
     },
     "receivers": {
+        "config_type": "grid",
         "x_rcvr_m": [1000.0],
         "y_rcvr_m": [1000.0],
         "z_rcvr_m": [1000.0]
@@ -60,9 +61,9 @@ with open(jsonfile, "w") as f:
 
 os.system(f"cargo run --release  {jsonfile}")
 
-rays = python_utils.load_rays(h5file)
-x_bty, y_bty, z_bty = python_utils.load_bty(h5file)
-freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(h5file)
+rays = python_utils.load_rays(outfile)
+x_bty, y_bty, z_bty = python_utils.load_bty(outfile)
+freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(outfile)
 pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
 tl = - 20 * np.log10(np.abs(pressure))
 

@@ -1,4 +1,4 @@
-import h5py
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -19,49 +19,55 @@ def munk(Z, min_c=1500.0, epsilon=0.00737, min_z1=1300.0, min_z2=1300.0):
 
     return c
 
-def load_rays(h5path):
-    with h5py.File(h5path, 'r') as f:
-        ray_group = f['ray_paths']
-        rays_path = []
-        for key in ray_group.keys():
-            rays_path.append(ray_group[key][:])
+def load_rays(jpath):
+    with open(jpath, 'r') as f:
+        data = json.load(f)
+    ray_group = data['ray_paths']
+    rays_path = []
+    for key in sorted(ray_group.keys(), key=lambda k: int(k.split('_')[1])):
+        rays_path.append(np.array(ray_group[key], dtype=np.float32))
     return rays_path
 
-def load_src(h5path):
-    with h5py.File(h5path, 'r') as f:
-        src = f['source']
-        launch_elev_deg = src['launch_elev_deg'][:]
-        launch_azim_deg = src['launch_azim_deg'][:]
-        source_pos = src['position'][:]
-        freq_hz = src['frequency_hz'][()]
+def load_src(jpath):
+    with open(jpath, 'r') as f:
+        data = json.load(f)
+    src = data['src']
+    launch_elev_deg = np.array(src['launch_elev_deg'])
+    launch_azim_deg = np.array(src['launch_azim_deg'])
+    source_pos = np.array(src['source_position_m'])
+    freq_hz = np.array(src['frequency_hz'])
     return launch_elev_deg, launch_azim_deg, source_pos, freq_hz
 
 
-def load_bty(h5path):
-    with h5py.File(h5path, 'r') as f:
-        bty = f['bty']
-        x_bty_m = bty['x_bty_m'][:]
-        y_bty_m = bty['y_bty_m'][:]
-        z_bty_m = bty['z_bty_m'][:]
-        z_bty_m = np.reshape(z_bty_m, (len(x_bty_m), len(y_bty_m)))
+def load_bty(jpath):
+    with open(jpath, 'r') as f:
+        data = json.load(f)
+    bty = data['bty']
+    x_bty_m = np.array(bty['x_bty_m'])
+    y_bty_m = np.array(bty['y_bty_m'])
+    z_bty_m = np.array(bty['z_bty_m'])
+    z_bty_m = np.reshape(z_bty_m, (len(x_bty_m), len(y_bty_m)))
     return x_bty_m, y_bty_m, z_bty_m.T
 
 
-def load_cmpx_pressure(h5path):
-    with h5py.File(h5path, 'r') as f:
-        pressure_field = f['pressure_field']
-        frequency_hz = pressure_field['frequency_hz'][:]
-        try:
-            x_m = pressure_field['x_m'][:]
-            y_m = pressure_field['y_m'][:]
-            z_m = pressure_field['z_m'][:]
-        except:
-            receiver_positions_m = pressure_field['receiver_positions_m'][:]
-            x_m = np.unique(receiver_positions_m[:, 0])
-            y_m = np.unique(receiver_positions_m[:, 1])
-            z_m = np.unique(receiver_positions_m[:, 2])
-        pressure_im = pressure_field['pressure_im'][:]
-        pressure_re = pressure_field['pressure_re'][:]
+def load_cmpx_pressure(jpath):
+    with open(jpath, 'r') as f:
+        data = json.load(f)
+    pf = data['pressure_field']
+    frequency_hz = np.array(pf['frequency_hz'])
+    if 'receiver_positions_m' in pf:
+        recs = np.array(pf['receiver_positions_m'])
+        x_m = np.unique(recs[:, 0])
+        y_m = np.unique(recs[:, 1])
+        z_m = np.unique(recs[:, 2])
+    else:
+        x_m = np.array(pf['x_m'])
+        y_m = np.array(pf['y_m'])
+        z_m = np.array(pf['z_m'])
+    re_entry = pf['pressure_re']
+    im_entry = pf['pressure_im']
+    pressure_re = np.array(re_entry['data'], dtype=np.float32).reshape(re_entry['shape'])
+    pressure_im = np.array(im_entry['data'], dtype=np.float32).reshape(im_entry['shape'])
     return frequency_hz, x_m, y_m, z_m, pressure_re + 1j * pressure_im
 
 

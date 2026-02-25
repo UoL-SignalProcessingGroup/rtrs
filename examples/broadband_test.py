@@ -141,7 +141,7 @@ ssp_pekeris_3d = np.tile(ssp_pekeris, (2, 2, 1))
 ssp_pekeris_3d_flat = ssp_pekeris_3d.flatten(order='C')
 
 jsonfile = "examples/testbb.json"
-h5file = "examples/testbb.h5"
+outfile = "examples/testbb.out.json"
 
 
 env_bbp = {
@@ -166,6 +166,7 @@ env_bbp = {
         "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
+        "config_type": "grid",
         "x_rcvr_m": [0.0],
         "y_rcvr_m": [30000.0],
         "z_rcvr_m": [20.0]
@@ -216,7 +217,7 @@ with open(jsonfile, "w") as f:
 # run rtrs with the JSON-like input (keeps original behavior of the example)
 os.system(f"cargo run --release  {jsonfile}")
 
-freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(h5file)
+freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(outfile)
 pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
 
 # Multiply frequency-domain pressure by source spectrum. Ensure frequency axes align.

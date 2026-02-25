@@ -10,7 +10,7 @@ munk_ssp_3d = np.tile(munk_ssp, (2, 2, 1))
 munk_ssp_3d_flat = munk_ssp_3d.flatten(order='C')
 name = "testm"
 jsonfile = f"examples/{name}.json"
-h5file = f"examples/{name}.h5"
+outfile = f"examples/{name}.out.json"
 
 env_m = {
     "ssp": {
@@ -56,9 +56,9 @@ with open(jsonfile, "w") as f:
 
 os.system(f"cargo run --release  {jsonfile}")
 
-rays = python_utils.load_rays(h5file)
-x_bty, y_bty, z_bty = python_utils.load_bty(h5file)
-freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(h5file)
+rays = python_utils.load_rays(outfile)
+x_bty, y_bty, z_bty = python_utils.load_bty(outfile)
+freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(outfile)
 pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
 tl = - 20 * np.log10(np.abs(pressure))
 # print(pressure)

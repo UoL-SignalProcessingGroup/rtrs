@@ -1,15 +1,13 @@
+# Ignore build artifacts and IDE files
 .DS_Store
 /target
-dev
+.vscode
+
+# Python virtual environments
+.venv/
+venv/
+*.egg-info/
 
 # Ignore output files from examples
-examples/*.h5
 examples/*.json
-
-./venv*
 examples/__pycache__
-
-examples/wavs/*
-
-flamegraph.svg
-cargo-flamegraph.trace

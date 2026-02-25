@@ -12,7 +12,7 @@ use anyhow::Result;
 use std::fs;
 
 use input::config::SimulationConfig;
-use output::write_hdf5;
+use output::write_json;
 
 fn load_config(path: &str) -> Result<SimulationConfig> {
     let text = fs::read_to_string(path)?;
@@ -33,16 +33,16 @@ fn main() -> Result<()> {
 
     let (ray_paths, pressure_field) = engine::core(&config);
 
-    // Derive output path: replace extension with .h5 (append if none)
+    // Derive output path: replace extension with .json (append if none)
     let out_path = {
         let mut p = std::path::PathBuf::from(in_path);
-        p.set_extension("h5");
+        p.set_extension("out.json");
         p
     };
 
-    // Write HDF5 output
+    // Write JSON output
     let out_path_str = out_path.to_str().expect("Invalid output path");
-    write_hdf5(out_path_str, &config, ray_paths, pressure_field)?;
+    write_json(out_path_str, &config, ray_paths, pressure_field)?;
     Ok(())
 }
 

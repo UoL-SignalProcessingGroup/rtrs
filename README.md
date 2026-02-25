@@ -20,29 +20,49 @@ Underwater acoustic ray tracing in Rust.
 
 ## Usage
 
-Build with cargo:
+### Rust
 
+Build with cargo:
 ```bash
 cargo build --release
 ```
 
-Build with python bindings:
-```
-maturin develop --release --features python
-```
-
-Run with json input file:
+Run with a JSON input file:
 ```bash
 cargo run --release <path_to_input_file>.json
 ```
 
-Install python bindings with maturin to a conda environment:
+### Python Bindings
+
+Set up a virtual environment and install dependencies:
 ```bash
-conda activate <your_env>
-maturin develop --release --features python
+python -m venv --prompt rtrs .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-See `examples/` for more usage details, specifically `examples/munk_test_pyo3.py` for python bindings usage. 
+Build the Rust extension into the active environment:
+```bash
+maturin develop --release
+```
+
+Rebuild after any changes to the Rust code:
+```bash
+maturin develop --release
+```
+
+> **Note:** If both `VIRTUAL_ENV` and `CONDA_PREFIX` are set (e.g. conda base is active), maturin will error. Run `unset CONDA_PREFIX` before `maturin develop`, or `conda deactivate` first.
+
+See `examples/` for usage, specifically `examples/munk_test_pyo3.py` for Python bindings.
+
+### PyPI
+
+When published to PyPI, the package can be installed with:
+```bash
+pip install rtrs
+```
+
+Pre-built wheels are distributed per platform and Python version via GitHub Actions using `maturin-action`, so no Rust toolchain is required.
 
 ## License
 MIT License. See LICENSE file for details.

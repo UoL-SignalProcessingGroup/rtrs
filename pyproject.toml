@@ -1,0 +1,24 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rtrs"
+version = "0.1.0"
+description = "Ray tracing acoustic propagation model"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy>=1.20",
+    "matplotlib>=3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "maturin>=1.0",
+]
+
+[tool.maturin]
+features = ["python"]
+module-name = "rtrs"

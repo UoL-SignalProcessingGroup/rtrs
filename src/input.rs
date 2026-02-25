@@ -53,15 +53,3 @@ pub mod config {
         pub beam: BeamSettings,
     }
 }
-
-
-
-
-/* TODO:
-Example JSON template for SimulationConfig:
-
-{
-
-}
-
-*/

@@ -161,10 +161,11 @@ env_bbm = {
     "source": {
         "position": [0.0, 0.0, 1000.0],
         "freq_hz": frequencies.tolist(),
-        "launch_elev_deg": np.linspace(-50.0, 50.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-80.0, 80.0, 1000).tolist(),
         "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
+        "config_type": "grid",
         "x_rcvr_m": [0.0],
         "y_rcvr_m": [50000.0],
         "z_rcvr_m": [1000.0]
