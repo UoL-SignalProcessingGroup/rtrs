@@ -36,9 +36,6 @@ env_bty = {
         "x_bty_m": list(x_bty),
         "y_bty_m": list(y_bty),
         "z_bty_m": list(z_bty_flat),
-        "density_g_cm3": 2.0,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.5
     },
     "source": {
         "position": [0.0, 25000.0, 50.0],

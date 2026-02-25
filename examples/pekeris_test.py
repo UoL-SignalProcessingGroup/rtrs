@@ -27,15 +27,14 @@ env_p = {
         "x_bty_m": [0.0, 30000.0],
         "y_bty_m": [0.0, 30000.0],
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.5,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.5
+        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
+        "bottom_density_g_cm3": 1.5     # g/cm3
     },
     "source": {
         "position": [0.0, 0.0, 25.0],
         "freq_hz": [500.0],
-        "launch_elev_deg": np.linspace(-70.0, 70.0, 139).tolist(),
-        "launch_azim_deg": np.linspace(-1.0, 1.0, 5).tolist()
+        "launch_elev_deg": np.linspace(-15.0, 15.0, 300).tolist(),
+        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
         "config_type": "grid",

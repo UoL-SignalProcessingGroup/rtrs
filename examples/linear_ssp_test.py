@@ -33,9 +33,6 @@ env = {
         "y_bty_m": [0.0, 30000.0],
         "z_bty_m": np.array([[water_depth, water_depth],
                               [water_depth, water_depth]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.5,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.5
     },
     "source": {
         "position": [0.0, 0.0, 25.0],

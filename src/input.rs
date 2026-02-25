@@ -25,21 +25,31 @@ pub mod config {
         }
     }
 
+    fn default_none_f32() -> Option<f32> { None }
+
     #[derive(Debug, Deserialize)]
     pub struct Bathymetry {
         pub x_bty_m: Vec<f32>, // x (m)
         pub y_bty_m: Vec<f32>, // y (m)
         pub z_bty_m: Vec<f32>, // z (m, positive down)
-        // not implemented:
-        // pub density_g_cm3: f32, // bottom density (g/cm^3)
-        // pub c_bty_m_s: f32, // bottom sound speed (m/s)
-        // pub attenuation_db: f32, // bottom attenuation (dB/meter)
+        #[serde(default = "default_none_f32")]
+        pub bottom_p_wave_speed_m_s: Option<f32>,
+        #[serde(default = "default_none_f32")]
+        pub bottom_density_g_cm3: Option<f32>,
+        #[serde(default = "default_none_f32")]
+        pub water_density_g_cm3: Option<f32>,
     }
 
     impl Bathymetry {
         fn validate(&self, errors: &mut Vec<String>, _warnings: &mut Vec<String>) {
             if self.z_bty_m.is_empty() {
                 errors.push("bathymetry: z_bty_m must not be empty".into());
+            }
+            if self.bottom_p_wave_speed_m_s.is_some() && self.bottom_density_g_cm3.is_none() {
+                errors.push("bathymetry: bottom_density_g_cm3 must be provided when bottom_p_wave_speed_m_s is set".into());
+            }
+            if self.bottom_density_g_cm3.is_some() && self.bottom_p_wave_speed_m_s.is_none() {
+                errors.push("bathymetry: bottom_p_wave_speed_m_s must be provided when bottom_density_g_cm3 is set".into());
             }
         }
     }

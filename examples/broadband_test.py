@@ -94,16 +94,16 @@ class BroadbandTest:
         return source_spectrum, frequencies
 
 fs = 400        # Sampling frequency (Hz)
-t = np.arange(0.0, 1.0, 1.0/fs)      # Time vector from 0 to 1 second
+t = np.arange(0.0, 2.0, 1.0/fs)      # Time vector from 0 to 1 second
 f0 = 50.0      # Center frequency of the Gaussian pulse (Hz)
 amp = 1.0      # Amplitude of the pulse
 source_len = 4
 
 bbt = BroadbandTest(fs, f0, amp, source_len, t)
 
-# source_time_series = bbt.hanning_window_source()
+source_time_series = bbt.hanning_window_source()
 # source_time_series = bbt.cw_pulse(duration=0.2, taper_len=0.01)
-source_time_series = bbt.lfm_pulse(duration=0.2, f1=20.0, f2=80.0, taper_len=0.01)
+# source_time_series = bbt.lfm_pulse(duration=0.2, f1=20.0, f2=80.0, taper_len=0.01)
 source_spectrum, frequencies = bbt.source_pulse_spectrum()
 
 plt.figure()
@@ -158,15 +158,15 @@ env_bbp = {
         "x_bty_m": [0.0, 30000.0],
         "y_bty_m": [0.0, 30000.0],
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.5,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.2
+        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
+        "bottom_density_g_cm3": 1.5,             # g/cm3
+        "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {
         "position": [0.0, 0.0, 25.0],
         "freq_hz": frequencies.tolist(),
-        "launch_elev_deg": np.linspace(-10.0, 10.0, 1000).tolist(),
-        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
+        "launch_elev_deg": np.linspace(-25.0, 25.0, 1000).tolist(),
+        "launch_azim_deg": np.linspace(-0.1, 0.1, 3).tolist()
     },
     "receivers": {
         "config_type": "grid",
@@ -192,9 +192,9 @@ env_bbm = {
         "x_bty_m": [0.0, 50000.0],
         "y_bty_m": [0.0, 50000.0],
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.5,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.2
+        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
+        "bottom_density_g_cm3": 1.8,             # g/cm3
+        "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
@@ -216,7 +216,7 @@ env_bbm = {
 }
 
 with open(jsonfile, "w") as f:
-    json.dump(env_bbm, f, indent=2)
+    json.dump(env_bbp, f, indent=2)
 
 # run rtrs with the JSON-like input (keeps original behavior of the example)
 os.system(f"cargo run --release  {jsonfile}")

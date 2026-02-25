@@ -5,9 +5,9 @@ pub struct BTYfield {
     pub x: Vec<f32>,
     pub y: Vec<f32>,
     pub z: Array2<f32>,
-    // pub density: f32,
-    // pub c: f32,
-    // pub atten: f32, // attenuation (nepers per meter for pressure amplitude)
+    pub bottom_p_wave_speed: Option<f32>, // Bottom halfspace P-wave speed (m/s). `None` gives rigid fallback.
+    pub bottom_density: Option<f32>,      // Bottom halfspace density (g/cm3). Only meaningful when `bottom_p_wave_speed` is `Some`.
+    pub water_density: f32,               // Water (upper halfspace) density (g/cm3). Defaults to 1.0.
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
@@ -25,21 +25,13 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
             confg.bathymetry.z_bty_m.len()
         ));
 
-    // Convert attenuation from dB (assumed dB per meter) to nepers per meter for
-    // pressure amplitude. 1 Np = 8.685889638065036 dB, and dB attenuation is
-    // typically quoted for intensity (power) in dB; if the input is already dB
-    // re: amplitude, the conversion differs by factor 20 vs 10. Here we assume
-    // `attenuation_db` is dB per meter for intensity (common), so convert to
-    // amplitude nepers/m by: nepers = (atten_dB / 20) * ln(10) = atten_dB * ln(10)/20.
-    // If attenuation_db is amplitude dB, remove the /20. This choice is noted.
-
     let bty_field = BTYfield {
         x: confg.bathymetry.x_bty_m.clone(),
         y: confg.bathymetry.y_bty_m.clone(),
         z: z_bty,
-        // density: confg.bathymetry.density_g_cm3, 
-        // c: confg.bathymetry.c_bty_m_s, 
-        // atten: confg.bathymetry.attenuation_db * std::f32::consts::LN_10 / 20.0,
+        bottom_p_wave_speed: confg.bathymetry.bottom_p_wave_speed_m_s,
+        bottom_density: confg.bathymetry.bottom_density_g_cm3,
+        water_density: confg.bathymetry.water_density_g_cm3.unwrap_or(1.0),
     };
 
     return bty_field;

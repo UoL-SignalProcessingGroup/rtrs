@@ -30,16 +30,18 @@ env_m = {
     "bathymetry": {
         "x_bty_m": [0.0, 50000.0],
         "y_bty_m": [0.0, 50000.0],
-        "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.6,
-        "c_bty_m_s": 1700.0,
-        "attenuation_db": 0.0
+        "z_bty_m": np.array([[5000.0, 5000.0],
+                              [5000.0, 5000.0]]).flatten(order='C').tolist(),
+        # Halfspace parameters
+        "bottom_p_wave_speed_m_s": 1600.0,      # bottom (m/s)
+        "bottom_density_g_cm3": 1.8,             # g/cm3
+        "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
-        "freq_hz": [50.0],
-        "launch_elev_deg": np.linspace(-70.0, 70.0, 139).tolist(),
-        "launch_azim_deg": np.linspace(-1.0, 1.0, 5).tolist()
+        "freq_hz": [200.0],
+        "launch_elev_deg": np.linspace(-40.0, 40.0, 500).tolist(),
+        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
         "config_type": "grid",
@@ -49,13 +51,10 @@ env_m = {
     },
     "beam": {
         "step_m": 10.0,
-        "max_steps": 100000,
-        "max_range_m": 50000.0
+        "max_steps": 100_000,
+        "max_range_m": 50_000.0
     }
 }
-
-print(f"launch elev deg: {env_m['source']['launch_elev_deg']}")
-print(f"launch azim deg: {env_m['source']['launch_azim_deg']}")
 
 # Call the Rust engine via PyO3 binding
 result = rtrs.run_simulation(env_m)

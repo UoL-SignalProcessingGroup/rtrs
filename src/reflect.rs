@@ -6,6 +6,7 @@ use crate::bty::{
 
 use std::f32::consts::PI;
 use crate::rays::ray_normal;
+use num_complex::Complex32;
 
 pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
     let ray = ray_history.last_mut().unwrap();
@@ -77,8 +78,9 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
             ray.position[1] += nudge * normal[1];
             ray.position[2] += nudge * normal[2];
             
-            // update ray properties for rigid bottom (no phase or amplitude change)
+            // Bottom boundary condition: fluid halfspace R, or vacuum fallback
             ray.num_bottom_bounces += 1;
+            apply_bottom_bc(ray, &normal, bty_field);
 
             // proceed to paraxial update below
         } else {
@@ -95,14 +97,14 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
     // compute an approximate incident direction by reflecting ray.direction back
     // across the last-used plane normal. 
 
-    // maybe a simpler approach is to use the current (post-reflection) direction but the Fortran uses incident normals.
+    // maybe a simpler approach is to use the current (post-reflection) direction but bellhop uses incident normals.
     // approximate by negating the reflected z component for surface only
     // which gives a reasonable e1,e2.
     let c_local = ray.c;
     let inc_dir = [ray.direction[0], ray.direction[1], -ray.direction[2]];
     let (e1, e2) = ray_normal(inc_dir, ray.phi, c_local);
 
-    // Build rayt (scaled tangent) and rayn2, rayn1 as in Fortran's CalcTangent_Normals
+    // Build rayt (scaled tangent) and rayn2, rayn1 as in bellhop's CalcTangent_Normals
     let rayt = [c_local * inc_dir[0], c_local * inc_dir[1], c_local * inc_dir[2]];
     // choose boundary normal for constructing rayn2: surface -> [0,0,1], bottom -> local normal
     // We will reuse the normal computed earlier when present; reconstruct if necessary
@@ -143,7 +145,7 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
     let r2 = 0.0_f32;
     let r3 = 0.0_f32;
 
-    // apply curvature change (Fortran formulas)
+    // apply curvature change (bellhop formulas)
     let p_tilde_out = [p_tilde_in[0] + q_tilde_in[0] * r1 - q_hat_in[0] * r2,
                        p_tilde_in[1] + q_tilde_in[1] * r1 - q_hat_in[1] * r2];
     let p_hat_out   = [p_hat_in[0]   + q_tilde_in[0] * r2 + q_hat_in[0] * r3,
@@ -159,9 +161,64 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
     // update det_q
     ray.det_q = ray.q_tilde[0]*ray.q_hat[1] - ray.q_tilde[1]*ray.q_hat[0];
 
-    // update phi as Fortran does
+    // update phi as bellhop does
     let dot_r = (rayn1[0]*e1[0] + rayn1[1]*e1[1] + rayn1[2]*e1[2]).clamp(-1.0, 1.0);
     ray.phi = ray.phi + 2.0 * dot_r.acos();
+}
+
+
+// Apply bottom boundary condition to `ray` at the moment of a bottom bounce.
+// Lossless fluid-fluid reflection happens if `bty_field.hs_cp` and `bty_field.hs_rho` are both `Some`, otherwise fallback to rigid reflection.
+fn apply_bottom_bc(ray: &mut Ray, normal: &[f32; 3], bty_field: &BTYfield) {
+
+    let bottom_p_wave_speed = match bty_field.bottom_p_wave_speed {
+        Some(v) => v,
+        None => {
+            // Rigid (perfectly reflecting) fallback: R = +1, no phase or amplitude change
+            return;
+        }
+    };
+    let density_bottom = match bty_field.bottom_density {
+        Some(v) => v,
+        None => return, // rigid fallback
+    };
+
+    let density_water = bty_field.water_density; // g/cm3  water (upper halfspace)
+
+    let c_w = ray.c;
+
+    // ray.direction is the slowness vector (|direction| = 1/c_w), already reflected (pointing back up).
+    // normal points upward into water (normal[2] < 0 for a near-flat bottom).
+    // Both are upward after the bounce, so their dot product is positive and equals Th
+    // (the normal component of slowness at the boundary, as in Bellhop's Th = dot(t, nBdry)).
+    let slowness_normal = normal[0] * ray.direction[0]
+                        + normal[1] * ray.direction[1]
+                        + normal[2] * ray.direction[2];
+
+    // Tangential slowness squared: |s|2 − s_n2  (Snell's law invariant across interface)
+    let slowness_tangential_sq = (1.0 / (c_w * c_w) - slowness_normal * slowness_normal).max(0.0);
+
+    // Normal slowness squared in the bottom halfspace (negative = post-critical / evanescent)
+    let slowness_normal_bottom_sq = slowness_tangential_sq - 1.0 / (bottom_p_wave_speed * bottom_p_wave_speed);
+
+    // Bellhop convention: imaginary below critical, real above critical
+    let vertical_slowness_bottom: Complex32 = if slowness_normal_bottom_sq >= 0.0 {
+        Complex32::new(slowness_normal_bottom_sq.sqrt(), 0.0)
+    } else {
+        Complex32::new(0.0, (-slowness_normal_bottom_sq).sqrt())
+    };
+
+    // Fluid–fluid plane-wave reflection coefficient (omega cancels throughout)
+    let num = vertical_slowness_bottom * density_water - Complex32::new(0.0, slowness_normal * density_bottom);
+    let den = vertical_slowness_bottom * density_water + Complex32::new(0.0, slowness_normal * density_bottom);
+
+    // Apply reflection coefficient to ray amplitude and phase. If |R| is very small, kill the ray.
+    if reflection_coeff.norm() < 1e-5 {
+        ray.amplitude = 0.0;    // kill
+    } else {
+        ray.amplitude *= reflection_coeff.norm();
+        ray.phase    += reflection_coeff.arg();
+    }
 }
 
 

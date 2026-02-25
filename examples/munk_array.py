@@ -26,9 +26,6 @@ env_m = {
         "x_bty_m": [0.0, 50000.0],
         "y_bty_m": [0.0, 50000.0],
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.6,
-        "c_bty_m_s": 1700.0,
-        "attenuation_db": 0.0
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],

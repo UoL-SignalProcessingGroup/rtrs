@@ -154,9 +154,9 @@ env_bbm = {
         "x_bty_m": [0.0, 50000.0],
         "y_bty_m": [0.0, 50000.0],
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        "density_g_cm3": 1.5,
-        "c_bty_m_s": 1600.0,
-        "attenuation_db": 0.2
+        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
+        "bottom_density_g_cm3": 1.5,             # g/cm3
+        "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],

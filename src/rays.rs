@@ -40,8 +40,6 @@ pub fn trace_ray(
 ) -> Vec<Ray> {
     // ray tracing main loop
 
-    // println!("Tracing ray at elev {:.2} deg, azim {:.2} deg", elev.to_degrees(), azim.to_degrees());
-
     let max_n_steps = config.beam.max_steps;
 
     let c = interpolate_c(config.source.position, &ssp_field);
@@ -71,7 +69,7 @@ pub fn trace_ray(
         // perform Euler step
         euler_step_ray(&mut ray_history, config.beam.step_m, step, ssp_field);
 
-        // check for boundary reflections (unified handler)
+        // check for boundary reflections
         reflect_boundaries(&mut ray_history, bty_field);
 
         // check for max range termination conditions
