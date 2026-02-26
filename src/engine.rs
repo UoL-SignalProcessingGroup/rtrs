@@ -60,35 +60,28 @@ pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureFiel
     let (mut indexed_paths, pressure_field) = angle_pairs
         .par_iter()
         .enumerate()
-        .map(|(idx, &(azim, elev))| {
-            let mut local_pressure_field = init_pressure_field(cfg);
-            
-            // Trace ray and compute influence
-            let mut ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
-            gaussian_beam_influence(&mut ray_history, &mut local_pressure_field, 
-                                   &bty_field, elev, d_azim, d_elev, &omega);
-            
-            // Extract ray path
-            let path = if store_ray_paths {
-                Some(
-                    ray_history
-                        .iter()
-                        .map(|r| r.position)
-                        .collect::<Vec<[f32; 3]>>(),
-                )
-            } else {
-                None
-            };
-            
-            (idx, path, local_pressure_field)
-        })
         .fold(
             || (Vec::<(usize, Vec<[f32; 3]>)>::new(), init_pressure_field(cfg)),
-            |mut acc, (idx, path, local_field)| {
-                if let Some(path) = path {
+            |mut acc, (idx, &(azim, elev))| {
+                let mut ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
+
+                gaussian_beam_influence(
+                    &mut ray_history,
+                    &mut acc.1,
+                    &bty_field,
+                    elev,
+                    d_azim,
+                    d_elev,
+                    &omega,
+                );
+
+                if store_ray_paths {
+                    let path = ray_history
+                        .iter()
+                        .map(|r| r.position)
+                        .collect::<Vec<[f32; 3]>>();
                     acc.0.push((idx, path));
                 }
-                merge_pressure_fields(&mut acc.1, &local_field);
                 acc
             },
         )

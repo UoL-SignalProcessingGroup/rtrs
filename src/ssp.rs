@@ -1,6 +1,13 @@
 use crate::input::config::SimulationConfig;
 use ndarray::Array3;
 
+#[derive(Clone, Copy, Debug)]
+pub struct SSPCursor {
+    pub i: usize,
+    pub j: usize,
+    pub k: usize,
+}
+
 pub struct SSPFields {
     x: Vec<f32>,
     y: Vec<f32>,
@@ -15,6 +22,86 @@ pub struct SSPFields {
     cxy: Array3<f32>,
     cxz: Array3<f32>,
     cyz: Array3<f32>,
+}
+
+fn find_cell_index(arr: &[f32], val: f32) -> usize {
+    match arr.binary_search_by(|probe| probe.partial_cmp(&val).unwrap()) {
+        Ok(i) => i.min(arr.len() - 2),
+        Err(i) => i.saturating_sub(1).min(arr.len() - 2),
+    }
+}
+
+fn march_cell_index(arr: &[f32], val: f32, idx: &mut usize) {
+    if arr.len() < 2 {
+        *idx = 0;
+        return;
+    }
+
+    let max_idx = arr.len() - 2;
+
+    if val <= arr[0] {
+        *idx = 0;
+        return;
+    }
+    if val >= arr[arr.len() - 1] {
+        *idx = max_idx;
+        return;
+    }
+
+    while *idx < max_idx && val > arr[*idx + 1] {
+        *idx += 1;
+    }
+    while *idx > 0 && val < arr[*idx] {
+        *idx -= 1;
+    }
+}
+
+pub fn init_ssp_cursor(position: [f32; 3], ssp: &SSPFields) -> SSPCursor {
+    SSPCursor {
+        i: find_cell_index(&ssp.x, position[0]),
+        j: find_cell_index(&ssp.y, position[1]),
+        k: find_cell_index(&ssp.z, position[2]),
+    }
+}
+
+pub fn update_ssp_cursor(position: [f32; 3], ssp: &SSPFields, cursor: &mut SSPCursor) {
+    march_cell_index(&ssp.x, position[0], &mut cursor.i);
+    march_cell_index(&ssp.y, position[1], &mut cursor.j);
+    march_cell_index(&ssp.z, position[2], &mut cursor.k);
+}
+
+pub fn reduce_step_to_ssp_interfaces(
+    position: [f32; 3],
+    unit_direction: [f32; 3],
+    step: f32,
+    ssp: &SSPFields,
+    cursor: &SSPCursor,
+) -> f32 {
+    let eps = 1.0e-9_f32;
+    let mut h = step;
+
+    let try_reduce = |arr: &[f32], pos: f32, vel: f32, idx: usize, h_cur: &mut f32| {
+        if vel.abs() <= eps {
+            return;
+        }
+
+        let boundary = if vel > 0.0 {
+            arr[idx + 1]
+        } else {
+            arr[idx]
+        };
+
+        let h_cross = (boundary - pos) / vel;
+        if h_cross > eps && h_cross < *h_cur {
+            *h_cur = h_cross;
+        }
+    };
+
+    try_reduce(&ssp.x, position[0], unit_direction[0], cursor.i, &mut h);
+    try_reduce(&ssp.y, position[1], unit_direction[1], cursor.j, &mut h);
+    try_reduce(&ssp.z, position[2], unit_direction[2], cursor.k, &mut h);
+
+    h
 }
 
 pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
@@ -79,28 +166,33 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
 }
 
 
-pub fn interpolate_c(position: [f32; 3], ssp: &SSPFields) -> f32 {
-    let c = trilinear_interpolation(position, &ssp.c, &ssp.x, &ssp.y, &ssp.z);
-    return c;
+pub fn interpolate_c_with_cursor(position: [f32; 3], ssp: &SSPFields, cursor: &mut SSPCursor) -> f32 {
+    trilinear_interpolation_with_cursor(position, &ssp.c, &ssp.x, &ssp.y, &ssp.z, cursor)
 }
 
-pub fn interpolate_grad_c(position: [f32; 3], ssp: &SSPFields) -> [f32; 3] {
-    // interpolate grad c at position
-    let cx = trilinear_interpolation(position, &ssp.cx, &ssp.x, &ssp.y, &ssp.z);
-    let cy = trilinear_interpolation(position, &ssp.cy, &ssp.x, &ssp.y, &ssp.z);
-    let cz = trilinear_interpolation(position, &ssp.cz, &ssp.x, &ssp.y, &ssp.z);
-    return [cx, cy, cz];
+pub fn interpolate_grad_c_with_cursor(
+    position: [f32; 3],
+    ssp: &SSPFields,
+    cursor: &mut SSPCursor,
+) -> [f32; 3] {
+    let cx = trilinear_interpolation_with_cursor(position, &ssp.cx, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let cy = trilinear_interpolation_with_cursor(position, &ssp.cy, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let cz = trilinear_interpolation_with_cursor(position, &ssp.cz, &ssp.x, &ssp.y, &ssp.z, cursor);
+    [cx, cy, cz]
 }
 
-pub fn interpolate_partials_c(position: [f32; 3], ssp: &SSPFields) -> [f32; 6] {
-    // interpolate cxx, cyy, czz, cxy, cxz, cyz at position
-    let cxx = trilinear_interpolation(position, &ssp.cxx, &ssp.x, &ssp.y, &ssp.z);
-    let cyy = trilinear_interpolation(position, &ssp.cyy, &ssp.x, &ssp.y, &ssp.z);
-    let czz = trilinear_interpolation(position, &ssp.czz, &ssp.x, &ssp.y, &ssp.z);
-    let cxy = trilinear_interpolation(position, &ssp.cxy, &ssp.x, &ssp.y, &ssp.z);
-    let cxz = trilinear_interpolation(position, &ssp.cxz, &ssp.x, &ssp.y, &ssp.z);
-    let cyz = trilinear_interpolation(position, &ssp.cyz, &ssp.x, &ssp.y, &ssp.z);
-    return [cxx, cyy, czz, cxy, cxz, cyz];
+pub fn interpolate_partials_c_with_cursor(
+    position: [f32; 3],
+    ssp: &SSPFields,
+    cursor: &mut SSPCursor,
+) -> [f32; 6] {
+    let cxx = trilinear_interpolation_with_cursor(position, &ssp.cxx, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let cyy = trilinear_interpolation_with_cursor(position, &ssp.cyy, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let czz = trilinear_interpolation_with_cursor(position, &ssp.czz, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let cxy = trilinear_interpolation_with_cursor(position, &ssp.cxy, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let cxz = trilinear_interpolation_with_cursor(position, &ssp.cxz, &ssp.x, &ssp.y, &ssp.z, cursor);
+    let cyz = trilinear_interpolation_with_cursor(position, &ssp.cyz, &ssp.x, &ssp.y, &ssp.z, cursor);
+    [cxx, cyy, czz, cxy, cxz, cyz]
 }
 
 pub fn calculate_ray_partials_c(
@@ -220,45 +312,37 @@ fn partial_z(c: &Array3<f32>, dz: f32) -> Array3<f32> {
 }
 
 
-fn trilinear_interpolation(
-    position: [f32; 3], 
-    field: &Array3<f32>, 
-    x: &[f32], 
-    y: &[f32], 
-    z: &[f32]
+// trilinear interpolation with cursor
+fn trilinear_interpolation_with_cursor(
+    position: [f32; 3],
+    field: &Array3<f32>,
+    x: &[f32],
+    y: &[f32],
+    z: &[f32],
+    cursor: &mut SSPCursor,
 ) -> f32 {
-    // Trilinear interpolation of field at position [x, y, z]
+    march_cell_index(x, position[0], &mut cursor.i);
+    march_cell_index(y, position[1], &mut cursor.j);
+    march_cell_index(z, position[2], &mut cursor.k);
 
-    // Find indices function  i, j, k such that x[i] <= position[0] < x[i+1], etc.
-    // use binary search as x,y,z arrays are sorted
-    let find_index = |arr: &[f32], val: f32| -> usize {
-        match arr.binary_search_by(|probe| probe.partial_cmp(&val).unwrap()) {
-            Ok(i) => i.min(arr.len() - 2), // exact match
-            Err(i) => i.saturating_sub(1).min(arr.len() - 2), // interval before insert position
-        }
-    };
+    let i = cursor.i;
+    let j = cursor.j;
+    let k = cursor.k;
 
-    // find indiceis
-    let i = find_index(x, position[0]);
-    let j = find_index(y, position[1]);
-    let k = find_index(z, position[2]);
-
-    // Compute normalized distances
     let xd = ((position[0] - x[i]) / (x[i + 1] - x[i])).clamp(0.0, 1.0);
     let yd = ((position[1] - y[j]) / (y[j + 1] - y[j])).clamp(0.0, 1.0);
     let zd = ((position[2] - z[k]) / (z[k + 1] - z[k])).clamp(0.0, 1.0);
 
-    // Compact trilinear interpolation
     let mut c = 0.0;
     for dx in 0..=1 {
         for dy in 0..=1 {
             for dz in 0..=1 {
-                let weight = 
+                let weight =
                     (if dx == 0 { 1.0 - xd } else { xd }) *
                     (if dy == 0 { 1.0 - yd } else { yd }) *
                     (if dz == 0 { 1.0 - zd } else { zd });
 
-                c += field[[i+dx, j+dy, k+dz]] * weight;
+                c += field[[i + dx, j + dy, k + dz]] * weight;
             }
         }
     }

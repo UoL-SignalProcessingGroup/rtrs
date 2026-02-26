@@ -1,9 +1,15 @@
-use crate::bty::{interpolate_bty, BottomBoundaryRuntimeModel, BTYfield};
+use crate::bty::{
+    bottom_normal_at_with_cursor,
+    interpolate_bty_with_cursor,
+    BottomBoundaryRuntimeModel,
+    BTYCursor,
+    BTYfield,
+};
 use crate::rays::{ray_normal, BottomBounceMetadata, Ray};
 use num_complex::Complex32;
 use std::f32::consts::PI;
 
-pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
+pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_cursor: &mut BTYCursor) {
     let ray = ray_history.last_mut().unwrap();
     ray.bottom_bounce = None;
 
@@ -12,7 +18,7 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
 
     // Determine which boundary (surface or bottom) — handle only one per step
     // Surface: z < 0.0
-    if ray.position[2] < 0.0 {
+    if ray.position[2] <= 0.0 && ray.direction[2] < 0.0 {
         incident_slowness_for_paraxial = ray.direction;
 
         // flat surface at z=0
@@ -48,13 +54,13 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield) {
         // proceed to paraxial update below
     } else {
         // Bottom: check against interpolated bottom depth
-        let z_bty = interpolate_bty(ray.position, bty_field);
-        if ray.position[2] >= z_bty {
+        let z_bty = interpolate_bty_with_cursor(ray.position, bty_field, bty_cursor);
+        if ray.position[2] >= z_bty && ray.direction[2] > 0.0 {
             let incident_slowness = ray.direction;
             incident_slowness_for_paraxial = incident_slowness;
 
             // compute local bottom normal
-            let (mut normal, _tangent) = calculate_bottom_normal_and_tangent(ray.position, bty_field);
+            let (mut normal, _tangent) = bottom_normal_at_with_cursor(ray.position, bty_field, bty_cursor);
             if normal[2] < 0.0 { normal = [-normal[0], -normal[1], -normal[2]]; }
             boundary_normal_for_paraxial = normal;
 
@@ -391,61 +397,3 @@ fn stable_complex_sqrt(value: Complex32) -> Complex32 {
     root
 }
 
-
-fn calculate_bottom_normal_and_tangent(
-    position: [f32; 3],
-    bty_field: &BTYfield,
-) -> ([f32; 3], [f32; 3]) {
-
-    // Find indices for x and y consistent with bilinear interpolation used in bty.rs
-    let find_index = |arr: &[f32], val: f32| -> usize {
-        match arr.binary_search_by(|probe| probe.partial_cmp(&val).unwrap()) {
-            Ok(i) => i.min(arr.len() - 2),
-            Err(i) => i.saturating_sub(1).min(arr.len() - 2),
-        }
-    };
-
-    let i = find_index(&bty_field.x, position[0]);
-    let j = find_index(&bty_field.y, position[1]);
-
-    // Grid spacing
-    let dx = bty_field.x[i + 1] - bty_field.x[i];
-    let dy = bty_field.y[j + 1] - bty_field.y[j];
-
-    // Normalized distances within the cell
-    let xd = ((position[0] - bty_field.x[i]) / dx).clamp(0.0, 1.0);
-    let yd = ((position[1] - bty_field.y[j]) / dy).clamp(0.0, 1.0);
-
-    // Corner depths (match bty.rs orientation: z[[i, j]])
-    let z00 = bty_field.z[[i, j]];
-    let z10 = bty_field.z[[i + 1, j]];
-    let z01 = bty_field.z[[i, j + 1]];
-    let z11 = bty_field.z[[i + 1, j + 1]];
-
-    // Bilinear slopes for dz/dx and dz/dy
-    let dzdx_y0 = (z10 - z00) / dx;
-    let dzdx_y1 = (z11 - z01) / dx;
-    let dzdx = (1.0 - yd) * dzdx_y0 + yd * dzdx_y1;
-
-    let dzdy_x0 = (z01 - z00) / dy;
-    let dzdy_x1 = (z11 - z10) / dy;
-    let dzdy = (1.0 - xd) * dzdy_x0 + xd * dzdy_x1;
-
-    // Upward pointing normal (if depth increases downward, upward is -z)
-    let nx = -dzdx;
-    let ny = -dzdy;
-    let nz = 1.0;
-    let norm_len = (nx * nx + ny * ny + nz * nz).sqrt();
-    let normal = [nx / norm_len, ny / norm_len, nz / norm_len];
-
-    // Tangent vector in x-y plane, perpendicular to projected normal
-    let tangent = [-ny, nx, 0.0];
-    let tnorm = (tangent[0] * tangent[0] + tangent[1] * tangent[1]).sqrt();
-    let tangent = if tnorm > 0.0 {
-        [tangent[0] / tnorm, tangent[1] / tnorm, 0.0]
-    } else {
-        [1.0, 0.0, 0.0]
-    };
-
-    (normal, tangent)
-}

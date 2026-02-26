@@ -44,14 +44,16 @@ env_m = {
     "source": {
         "position": [0.0, 0.0, 1000.0],
         "freq_hz": [200.0],
+        # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
         "launch_elev_deg": np.linspace(-50.0, 50.0, 500).tolist(),
         "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
     },
     "receivers": {
         "config_type": "grid",
         "x_rcvr_m": [0.0],
-        "y_rcvr_m": np.linspace(0.0, 50000.0, 500).tolist(),
-        "z_rcvr_m": np.linspace(0.0, 5000.0, 500).tolist()
+        # "x_rcvr_m": np.full(250,0.0).tolist(),
+        "y_rcvr_m": np.linspace(0.0, 50000.0, 150).tolist(),
+        "z_rcvr_m": np.linspace(0.0, 5000.0, 150).tolist()
     },
     "beam": {
         "step_m": 10.0,
