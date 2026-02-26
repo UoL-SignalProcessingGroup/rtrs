@@ -12,6 +12,13 @@ use crate::reflect::{
     reflect_boundaries,
 };
 
+#[derive(Clone, Copy)]
+pub struct BottomBounceMetadata {
+    pub boundary_normal: [f32; 3],
+    pub incident_slowness: [f32; 3],
+    pub water_sound_speed_m_s: f32,
+}
+
 #[derive(Clone)]
 pub struct Ray {
     pub position: [f32; 3],
@@ -28,6 +35,7 @@ pub struct Ray {
     pub q_hat: [f32; 2],
     pub det_q: f32,
     pub c: f32, // local sound speed
+    pub bottom_bounce: Option<BottomBounceMetadata>,
 }
 
 
@@ -59,6 +67,7 @@ pub fn trace_ray(
         q_hat: [0.0, 0.0],
         det_q: 0.0,
         c: c,
+        bottom_bounce: None,
     };
 
     let mut ray_history: Vec<Ray> = Vec::with_capacity(max_n_steps);
@@ -163,6 +172,7 @@ fn euler_step_ray(ray_history: &mut Vec<Ray>, ds: f32, step: usize, ssp: &SSPFie
     ray1.phase = ray0.phase;
     ray1.num_top_bounces = ray0.num_top_bounces;
     ray1.num_bottom_bounces = ray0.num_bottom_bounces;
+    ray1.bottom_bounce = None;
 
     // append new ray state
     ray_history.push(ray1);

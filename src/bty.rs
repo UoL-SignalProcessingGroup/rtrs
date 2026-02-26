@@ -1,13 +1,29 @@
-use crate::input::config::SimulationConfig;
+use crate::input::config::{BottomBoundaryModel as BottomBoundaryInputModel, SimulationConfig};
 use ndarray::Array2;
+
+#[derive(Clone)]
+pub enum BottomBoundaryRuntimeModel {
+    Rigid,
+    Acoustic {
+        compressional_speed_m_s: f32,
+        density_g_cm3: f32,
+        compressional_attenuation_db_per_wavelength: f32,
+    },
+    Elastic {
+        compressional_speed_m_s: f32,
+        shear_speed_m_s: f32,
+        density_g_cm3: f32,
+        compressional_attenuation_db_per_wavelength: f32,
+        shear_attenuation_db_per_wavelength: f32,
+    },
+}
 
 pub struct BTYfield {
     pub x: Vec<f32>,
     pub y: Vec<f32>,
     pub z: Array2<f32>,
-    pub bottom_p_wave_speed: Option<f32>, // Bottom halfspace P-wave speed (m/s). `None` gives rigid fallback.
-    pub bottom_density: Option<f32>,      // Bottom halfspace density (g/cm3). Only meaningful when `bottom_p_wave_speed` is `Some`.
-    pub water_density: f32,               // Water (upper halfspace) density (g/cm3). Defaults to 1.0.
+    pub bottom_model: BottomBoundaryRuntimeModel,
+    pub water_density_g_cm3: f32,
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
@@ -25,13 +41,38 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
             confg.bathymetry.z_bty_m.len()
         ));
 
+    let bottom_model = match &confg.bathymetry.bottom_model {
+        BottomBoundaryInputModel::Rigid => BottomBoundaryRuntimeModel::Rigid,
+        BottomBoundaryInputModel::Acoustic {
+            compressional_speed_m_s,
+            density_g_cm3,
+            compressional_attenuation_db_per_wavelength,
+        } => BottomBoundaryRuntimeModel::Acoustic {
+            compressional_speed_m_s: *compressional_speed_m_s,
+            density_g_cm3: *density_g_cm3,
+            compressional_attenuation_db_per_wavelength: compressional_attenuation_db_per_wavelength.unwrap_or(0.0),
+        },
+        BottomBoundaryInputModel::Elastic {
+            compressional_speed_m_s,
+            shear_speed_m_s,
+            density_g_cm3,
+            compressional_attenuation_db_per_wavelength,
+            shear_attenuation_db_per_wavelength,
+        } => BottomBoundaryRuntimeModel::Elastic {
+            compressional_speed_m_s: *compressional_speed_m_s,
+            shear_speed_m_s: *shear_speed_m_s,
+            density_g_cm3: *density_g_cm3,
+            compressional_attenuation_db_per_wavelength: compressional_attenuation_db_per_wavelength.unwrap_or(0.0),
+            shear_attenuation_db_per_wavelength: shear_attenuation_db_per_wavelength.unwrap_or(0.0),
+        },
+    };
+
     let bty_field = BTYfield {
         x: confg.bathymetry.x_bty_m.clone(),
         y: confg.bathymetry.y_bty_m.clone(),
         z: z_bty,
-        bottom_p_wave_speed: confg.bathymetry.bottom_p_wave_speed_m_s,
-        bottom_density: confg.bathymetry.bottom_density_g_cm3,
-        water_density: confg.bathymetry.water_density_g_cm3.unwrap_or(1.0),
+        bottom_model,
+        water_density_g_cm3: confg.bathymetry.water_density_g_cm3.unwrap_or(1.0),
     };
 
     return bty_field;

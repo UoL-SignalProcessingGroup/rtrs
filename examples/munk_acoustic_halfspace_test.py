@@ -31,9 +31,12 @@ env_m = {
         "y_bty_m": [0.0, 50000.0],
         "z_bty_m": np.array([[5000.0, 5000.0],
                               [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        # Halfspace parameters
-        "bottom_p_wave_speed_m_s": 1600.0,      # bottom (m/s)
-        "bottom_density_g_cm3": 1.8,             # g/cm3
+        "bottom_model": {
+            "model": "acoustic",
+            "compressional_speed_m_s": 1600.0,
+            "density_g_cm3": 1.5,
+            "compressional_attenuation_db_per_wavelength": 0.2
+        },
         "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {

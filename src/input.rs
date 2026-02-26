@@ -2,6 +2,8 @@ pub mod config {
     use anyhow::{bail, Result};
     use serde::Deserialize;
 
+    fn default_none_f32() -> Option<f32> { None }
+
     #[derive(Debug, Deserialize)]
     pub struct SoundSpeed {
         pub x_ssp_m: Vec<f32>, // x (m)
@@ -25,19 +27,90 @@ pub mod config {
         }
     }
 
-    fn default_none_f32() -> Option<f32> { None }
-
     #[derive(Debug, Deserialize)]
     pub struct Bathymetry {
         pub x_bty_m: Vec<f32>, // x (m)
         pub y_bty_m: Vec<f32>, // y (m)
         pub z_bty_m: Vec<f32>, // z (m, positive down)
         #[serde(default = "default_none_f32")]
-        pub bottom_p_wave_speed_m_s: Option<f32>,
-        #[serde(default = "default_none_f32")]
-        pub bottom_density_g_cm3: Option<f32>,
-        #[serde(default = "default_none_f32")]
         pub water_density_g_cm3: Option<f32>,
+        #[serde(default = "default_bottom_boundary_model")]
+        pub bottom_model: BottomBoundaryModel,
+    }
+
+    fn default_bottom_boundary_model() -> BottomBoundaryModel { BottomBoundaryModel::Rigid }
+
+    #[derive(Debug, Deserialize, Clone)]
+    #[serde(rename_all = "snake_case", tag = "model")]
+    pub enum BottomBoundaryModel {
+        Rigid,
+        Acoustic {
+            compressional_speed_m_s: f32,
+            density_g_cm3: f32,
+            #[serde(default = "default_none_f32")]
+            compressional_attenuation_db_per_wavelength: Option<f32>,
+        },
+        Elastic {
+            compressional_speed_m_s: f32,
+            shear_speed_m_s: f32,
+            density_g_cm3: f32,
+            #[serde(default = "default_none_f32")]
+            compressional_attenuation_db_per_wavelength: Option<f32>,
+            #[serde(default = "default_none_f32")]
+            shear_attenuation_db_per_wavelength: Option<f32>,
+        },
+    }
+
+    impl BottomBoundaryModel {
+        fn validate(&self, errors: &mut Vec<String>) {
+            match self {
+                BottomBoundaryModel::Rigid => {}
+                BottomBoundaryModel::Acoustic {
+                    compressional_speed_m_s,
+                    density_g_cm3,
+                    compressional_attenuation_db_per_wavelength,
+                } => {
+                    if *compressional_speed_m_s <= 0.0 {
+                        errors.push("bathymetry.bottom_model: acoustic compressional_speed_m_s must be positive".into());
+                    }
+                    if *density_g_cm3 <= 0.0 {
+                        errors.push("bathymetry.bottom_model: acoustic density_g_cm3 must be positive".into());
+                    }
+                    if let Some(value) = compressional_attenuation_db_per_wavelength {
+                        if *value < 0.0 {
+                            errors.push("bathymetry.bottom_model: acoustic compressional_attenuation_db_per_wavelength must be >= 0".into());
+                        }
+                    }
+                }
+                BottomBoundaryModel::Elastic {
+                    compressional_speed_m_s,
+                    shear_speed_m_s,
+                    density_g_cm3,
+                    compressional_attenuation_db_per_wavelength,
+                    shear_attenuation_db_per_wavelength,
+                } => {
+                    if *compressional_speed_m_s <= 0.0 {
+                        errors.push("bathymetry.bottom_model: elastic compressional_speed_m_s must be positive".into());
+                    }
+                    if *shear_speed_m_s <= 0.0 {
+                        errors.push("bathymetry.bottom_model: elastic shear_speed_m_s must be positive".into());
+                    }
+                    if *density_g_cm3 <= 0.0 {
+                        errors.push("bathymetry.bottom_model: elastic density_g_cm3 must be positive".into());
+                    }
+                    if let Some(value) = compressional_attenuation_db_per_wavelength {
+                        if *value < 0.0 {
+                            errors.push("bathymetry.bottom_model: elastic compressional_attenuation_db_per_wavelength must be >= 0".into());
+                        }
+                    }
+                    if let Some(value) = shear_attenuation_db_per_wavelength {
+                        if *value < 0.0 {
+                            errors.push("bathymetry.bottom_model: elastic shear_attenuation_db_per_wavelength must be >= 0".into());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     impl Bathymetry {
@@ -45,12 +118,12 @@ pub mod config {
             if self.z_bty_m.is_empty() {
                 errors.push("bathymetry: z_bty_m must not be empty".into());
             }
-            if self.bottom_p_wave_speed_m_s.is_some() && self.bottom_density_g_cm3.is_none() {
-                errors.push("bathymetry: bottom_density_g_cm3 must be provided when bottom_p_wave_speed_m_s is set".into());
+            if let Some(value) = self.water_density_g_cm3 {
+                if value <= 0.0 {
+                    errors.push("bathymetry: water_density_g_cm3 must be positive when provided".into());
+                }
             }
-            if self.bottom_density_g_cm3.is_some() && self.bottom_p_wave_speed_m_s.is_none() {
-                errors.push("bathymetry: bottom_p_wave_speed_m_s must be provided when bottom_density_g_cm3 is set".into());
-            }
+            self.bottom_model.validate(errors);
         }
     }
 
@@ -71,6 +144,9 @@ pub mod config {
                     self.position[2].abs()
                 ));
                 self.position[2] = self.position[2].abs();
+            }
+            if self.freq_hz.iter().any(|&f| f < 0.0 ) {
+                errors.push("source: frequencies in freq_hz must be non-negative".into());
             }
             if self.launch_elev_deg.iter().any(|&a| a < -90.0 || a > 90.0) {
                 errors.push("source: launch elevation angles must be in [-90, 90] deg".into());

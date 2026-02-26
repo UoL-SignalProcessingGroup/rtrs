@@ -94,7 +94,7 @@ class BroadbandTest:
         return source_spectrum, frequencies
 
 fs = 400        # Sampling frequency (Hz)
-t = np.arange(0.0, 2.0, 1.0/fs)      # Time vector from 0 to 1 second
+t = np.arange(0.0, 1.5, 1.0/fs)      # Time vector from 0 to 1 second
 f0 = 50.0      # Center frequency of the Gaussian pulse (Hz)
 amp = 1.0      # Amplitude of the pulse
 source_len = 4
@@ -158,9 +158,14 @@ env_bbp = {
         "x_bty_m": [0.0, 30000.0],
         "y_bty_m": [0.0, 30000.0],
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
-        "bottom_density_g_cm3": 1.5,             # g/cm3
-        "water_density_g_cm3": 1.0,              # g/cm3
+        "bottom_model": {
+            "model": "acoustic",
+            "compressional_speed_m_s": 1600.0,
+            # "shear_speed_m_s": 400.0,
+            "density_g_cm3": 1.5,
+            "compressional_attenuation_db_per_wavelength": 0.2,
+            # "shear_attenuation_db_per_wavelength": 0.35
+        }
     },
     "source": {
         "position": [0.0, 0.0, 25.0],
@@ -192,8 +197,12 @@ env_bbm = {
         "x_bty_m": [0.0, 50000.0],
         "y_bty_m": [0.0, 50000.0],
         "z_bty_m": np.array([[5000.0, 5000.0], [5000.0, 5000.0]]).flatten(order='C').tolist(),
-        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
-        "bottom_density_g_cm3": 1.8,             # g/cm3
+        "bottom_model": {
+            "model": "acoustic",
+            "compressional_speed_m_s": 1600.0,
+            "density_g_cm3": 1.8,
+            "compressional_attenuation_db_per_wavelength": 0.0
+        },
         "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {

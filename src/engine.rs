@@ -46,7 +46,7 @@ pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
             // Trace ray and compute influence
             let mut ray_history = trace_ray(azim, elev, cfg, &ssp_field, &bty_field);
             gaussian_beam_influence(&mut ray_history, &mut local_pressure_field, 
-                                   elev, d_azim, d_elev, &omega);
+                                   &bty_field, elev, d_azim, d_elev, &omega);
             
             // Extract ray path
             let path = ray_history.iter()

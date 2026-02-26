@@ -1,5 +1,7 @@
 use crate::input::config::SimulationConfig;
 use crate::rays::{Ray};
+use crate::bty::BTYfield;
+use crate::reflect::compute_bottom_reflection_coefficient;
 use crate::utils::{
     dot,
     sub,
@@ -114,6 +116,7 @@ fn scale_beam(elev: f32, d_elev: f32, d_azim: f32, ray: &mut [Ray]) {
 pub fn gaussian_beam_influence(
     ray_history: &mut Vec<Ray>, 
     pressure_field: &mut PressureField,
+    bty_field: &BTYfield,
     elev: f32,
     d_azim: f32,
     d_elev: f32,
@@ -145,6 +148,25 @@ pub fn gaussian_beam_influence(
     for is in 0..n_steps {
         let ray = &ray_history[is];
         (e1_g[is], e2_g[is]) = crate::rays::ray_normal(ray.direction, ray.phi, ray.c);
+    }
+
+    let mut cumulative_bottom_reflection: Vec<Vec<Complex32>> =
+        vec![vec![Complex32::new(1.0, 0.0); omega.len()]; n_steps];
+    for is in 1..n_steps {
+        cumulative_bottom_reflection[is] = cumulative_bottom_reflection[is - 1].clone();
+        if let Some(bottom_bounce) = ray_history[is].bottom_bounce {
+            for (ifreq, &angular_frequency_rad_s) in omega.iter().enumerate() {
+                let reflection = compute_bottom_reflection_coefficient(
+                    &bty_field.bottom_model,
+                    bty_field.water_density_g_cm3,
+                    bottom_bounce.water_sound_speed_m_s,
+                    bottom_bounce.incident_slowness,
+                    bottom_bounce.boundary_normal,
+                    angular_frequency_rad_s,
+                );
+                cumulative_bottom_reflection[is][ifreq] *= reflection;
+            }
+        }
     }
 
     // Pre-calc maximum gaussian radii for quick rejection (approx from q elements)
@@ -267,7 +289,8 @@ pub fn gaussian_beam_influence(
                 for (ifreq, &om) in omega.iter().enumerate() {
                     let phase = om * delay - phase_int;
                     let (s, c) = phase.sin_cos();
-                    let contribution = Complex32::new(amp * c, amp * s);
+                    let base_contribution = Complex32::new(amp * c, amp * s);
+                    let contribution = cumulative_bottom_reflection[is - 1][ifreq] * base_contribution;
                     pressure_field.pressure[[ifreq, irec, 0, 0]] += contribution;
                 }
             }
@@ -423,7 +446,8 @@ pub fn gaussian_beam_influence(
                     for (ifreq, &om) in omega.iter().enumerate() {
                         let phase = om * delay - phase_int;
                         let (s, c) = phase.sin_cos();
-                        let contribution = Complex32::new(amp * c, amp * s);
+                        let base_contribution = Complex32::new(amp * c, amp * s);
+                        let contribution = cumulative_bottom_reflection[is - 1][ifreq] * base_contribution;
                         pressure_field.pressure[[ifreq, ix, iy, iz]] += contribution;
                     }
                 }

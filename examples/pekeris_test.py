@@ -27,14 +27,21 @@ env_p = {
         "x_bty_m": [0.0, 30000.0],
         "y_bty_m": [0.0, 30000.0],
         "z_bty_m": np.array([[100.0, 100.0], [100.0, 100.0]]).flatten(order='C').tolist(),
-        "bottom_p_wave_speed_m_s": 1600.0,        # bottom (m/s)
-        "bottom_density_g_cm3": 1.5     # g/cm3
+        "bottom_model": {
+            "model": "acoustic",
+            "compressional_speed_m_s": 1600.0,
+            # "shear_speed_m_s": 400.0,
+            "density_g_cm3": 1.5,
+            "compressional_attenuation_db_per_wavelength": 0.2,
+            # "shear_attenuation_db_per_wavelength": 0.35
+        }
     },
     "source": {
         "position": [0.0, 0.0, 25.0],
-        "freq_hz": [500.0],
+        "freq_hz": [50.0],
         "launch_elev_deg": np.linspace(-15.0, 15.0, 300).tolist(),
         "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
+        # "launch_azim_deg": [0.0]
     },
     "receivers": {
         "config_type": "grid",

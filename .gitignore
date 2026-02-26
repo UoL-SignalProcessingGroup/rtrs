@@ -11,3 +11,6 @@ venv/
 # Ignore output files from examples
 examples/*.json
 examples/__pycache__
+
+# ignore bins
+bins/
