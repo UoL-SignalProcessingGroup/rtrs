@@ -213,6 +213,7 @@ fn apply_bottom_bc(ray: &mut Ray, normal: &[f32; 3], bty_field: &BTYfield) {
     let den = vertical_slowness_bottom * density_water + Complex32::new(0.0, slowness_normal * density_bottom);
 
     // Apply reflection coefficient to ray amplitude and phase. If |R| is very small, kill the ray.
+    let reflection_coeff = - num / den;
     if reflection_coeff.norm() < 1e-5 {
         ray.amplitude = 0.0;    // kill
     } else {
