@@ -3,10 +3,28 @@ use crate::rays::trace_ray;
 use crate::ssp::init_ssp;
 use crate::bty;
 use crate::influence::{gaussian_beam_influence, init_pressure_field, PressureField};
+use ndarray::Zip;
 use rayon::prelude::*;
 use std::f32::consts::PI;
 
-pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
+fn merge_pressure_fields(dst: &mut PressureField, src: &PressureField) {
+    Zip::from(&mut dst.pressure)
+        .and(&src.pressure)
+        .for_each(|d, s| *d += *s);
+
+    Zip::from(&mut dst.delay_s)
+        .and(&mut dst.amplitude)
+        .and(&src.delay_s)
+        .and(&src.amplitude)
+        .for_each(|d_delay, d_amp, &s_delay, &s_amp| {
+            if s_delay < *d_delay {
+                *d_delay = s_delay;
+                *d_amp = s_amp;
+            }
+        });
+}
+
+pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureField) {
 
     // convert angles to radians
     let launch_elev_rad: Vec<f32> = cfg.source.launch_elev_deg.iter().map(|d| d.to_radians()).collect();    // "alpha" in Fortran
@@ -36,11 +54,13 @@ pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
         })
         .collect();
     
-    // Process rays in parallel - each thread gets its own local pressure field
-    let results: Vec<_> = angle_pairs
+    // Process rays in parallel with worker-local accumulation and reduce
+    let store_ray_paths = cfg.beam.store_ray_paths;
+
+    let (mut indexed_paths, pressure_field) = angle_pairs
         .par_iter()
-        .map(|&(azim, elev)| {
-            // Each thread initializes its own local pressure field
+        .enumerate()
+        .map(|(idx, &(azim, elev))| {
             let mut local_pressure_field = init_pressure_field(cfg);
             
             // Trace ray and compute influence
@@ -49,32 +69,49 @@ pub fn core(cfg: &SimulationConfig) -> (Vec<Vec<[f32; 3]>>, PressureField) {
                                    &bty_field, elev, d_azim, d_elev, &omega);
             
             // Extract ray path
-            let path = ray_history.iter()
-                .map(|r| r.position)
-                .collect::<Vec<[f32; 3]>>();
+            let path = if store_ray_paths {
+                Some(
+                    ray_history
+                        .iter()
+                        .map(|r| r.position)
+                        .collect::<Vec<[f32; 3]>>(),
+                )
+            } else {
+                None
+            };
             
-            (path, local_pressure_field)
+            (idx, path, local_pressure_field)
         })
-        .collect();
-    
-    // Separate ray paths and local pressure fields
-    let (ray_paths, local_fields): (Vec<_>, Vec<_>) = results.into_iter().unzip();
-    
-    // Merge all local pressure fields into the final one
-    let mut pressure_field = init_pressure_field(cfg);
-    for local_field in local_fields {
-        // Element-wise addition of pressure arrays
-        pressure_field.pressure += &local_field.pressure;
-        
-        // Merge delay and amplitude: keep the earliest arrival with its amplitude
-        for idx in ndarray::indices(pressure_field.delay_s.raw_dim()) {
-            let local_delay = local_field.delay_s[idx];
-            if local_delay < pressure_field.delay_s[idx] {
-                pressure_field.delay_s[idx] = local_delay;
-                pressure_field.amplitude[idx] = local_field.amplitude[idx];
-            }
-        }
-    }
+        .fold(
+            || (Vec::<(usize, Vec<[f32; 3]>)>::new(), init_pressure_field(cfg)),
+            |mut acc, (idx, path, local_field)| {
+                if let Some(path) = path {
+                    acc.0.push((idx, path));
+                }
+                merge_pressure_fields(&mut acc.1, &local_field);
+                acc
+            },
+        )
+        .reduce(
+            || (Vec::<(usize, Vec<[f32; 3]>)>::new(), init_pressure_field(cfg)),
+            |mut left, right| {
+                left.0.extend(right.0);
+                merge_pressure_fields(&mut left.1, &right.1);
+                left
+            },
+        );
+
+    let ray_paths = if store_ray_paths {
+        indexed_paths.sort_by_key(|(idx, _)| *idx);
+        Some(
+            indexed_paths
+                .into_iter()
+                .map(|(_, path)| path)
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        None
+    };
 
     return (ray_paths, pressure_field);
 }

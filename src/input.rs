@@ -3,6 +3,7 @@ pub mod config {
     use serde::Deserialize;
 
     fn default_none_f32() -> Option<f32> { None }
+    fn default_true() -> bool { true }
 
     #[derive(Debug, Deserialize)]
     pub struct SoundSpeed {
@@ -184,6 +185,8 @@ pub mod config {
         pub step_m: f32,
         pub max_steps: usize,
         pub max_range_m: f32,
+        #[serde(default = "default_true")]
+        pub store_ray_paths: bool,
     }
 
     impl BeamSettings {
@@ -218,6 +221,7 @@ pub mod config {
             self.source.validate(&mut errors, &mut warnings);
             self.receivers.validate(&mut errors, &mut warnings);
             self.beam.validate(&mut errors, &mut warnings);
+
             if errors.is_empty() {
                 Ok(warnings)
             } else {

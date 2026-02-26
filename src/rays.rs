@@ -87,9 +87,9 @@ pub fn trace_ray(
         }
         
         // check for number of bottom bounces
-        if ray_history.last().unwrap().num_bottom_bounces >= 10 {
-            break;
-        }
+        // if ray_history.last().unwrap().num_bottom_bounces >= 10 {
+        //     break;
+        // }
     }
 
     return ray_history;

@@ -12,6 +12,7 @@ Underwater acoustic ray tracing in Rust.
 - IO with json files
 - Receiver representation for grids and arrays
 - Parallel processing over the number of rays / beams with rayon
+- Optional no-ray-path mode to reduce memory and output size
 
 ## Planned Features
 - Low frequency correction

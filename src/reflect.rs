@@ -340,7 +340,7 @@ pub fn compute_bottom_reflection_coefficient(
         }
     };
 
-    if reflection_coefficient.norm() < 1e-5 {
+    if reflection_coefficient.norm() < 1e-12 {
         Complex32::new(0.0, 0.0)
     } else {
         reflection_coefficient

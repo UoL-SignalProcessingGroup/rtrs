@@ -5,6 +5,8 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyAny;
 #[cfg(feature = "python")]
+use pyo3::types::PyDict;
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
 
 #[cfg(feature = "python")]
@@ -39,27 +41,6 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
 
     let (ray_paths, pressure_field) = engine::core(&cfg);
 
-    #[derive(serde::Serialize)]
-    struct PressureOut<'a> {
-    x_m: &'a Vec<f32>,
-    y_m: &'a Vec<f32>,
-    z_m: &'a Vec<f32>,
-    // for array-mode receivers, explicit positions (N x 3) will be returned instead
-    receiver_positions_m: Option<&'a Vec<[f32; 3]>>,
-    frequency_hz: &'a Vec<f32>,
-    shape: (usize, usize, usize, usize),
-    pressure_re: Vec<f32>,
-    pressure_im: Vec<f32>,
-    delay_s: Vec<f32>,
-    amplitude: Vec<f32>,
-    }
-
-    #[derive(serde::Serialize)]
-    struct Out<'a> {
-        ray_paths: &'a Vec<Vec<[f32; 3]>>,
-        pressure_field: PressureOut<'a>,
-    }
-
     let shape = pressure_field.pressure.dim();
     let (nfreq, nx, ny, nz) = (shape.0, shape.1, shape.2, shape.3);
     let mut re_flat: Vec<f32> = Vec::with_capacity(nfreq * nx * ny * nz);
@@ -88,26 +69,56 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
         }
     }
 
-    let p_out = PressureOut{
-        x_m: &pressure_field.x_m,
-        y_m: &pressure_field.y_m,
-        z_m: &pressure_field.z_m,
-        receiver_positions_m: pressure_field.receiver_positions_m.as_ref(),
-        frequency_hz: &cfg.source.freq_hz,
-        shape: (nfreq, nx, ny, nz),
-        pressure_re: re_flat,
-        pressure_im: im_flat,
-        delay_s: delay_flat,
-        amplitude: amp_flat,
-    };
+    let out = PyDict::new(py);
+    if let Some(ray_paths) = ray_paths.as_ref() {
+        out.set_item("ray_paths", ray_paths)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to set ray_paths: {}", e)))?;
+    }
 
-    let out = Out { ray_paths: &ray_paths, pressure_field: p_out };
+    let p_out = PyDict::new(py);
+    if pressure_field.is_array {
+        let receiver_positions = pressure_field
+            .receiver_positions_m
+            .as_ref()
+            .expect("receiver_positions_m present for array mode");
+        p_out
+            .set_item("receiver_positions_m", receiver_positions)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to set receiver_positions_m: {}", e)))?;
+    } else {
+        p_out
+            .set_item("x_m", &pressure_field.x_m)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to set x_m: {}", e)))?;
+        p_out
+            .set_item("y_m", &pressure_field.y_m)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to set y_m: {}", e)))?;
+        p_out
+            .set_item("z_m", &pressure_field.z_m)
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to set z_m: {}", e)))?;
+    }
 
-    let out_json = serde_json::to_string(&out).map_err(|e| PyRuntimeError::new_err(format!("failed to serialize output: {}", e)))?;
-    let py_obj = json_mod.call_method1("loads", (out_json,))
-        .map_err(|e| PyRuntimeError::new_err(format!("json.loads failed: {}", e)))?;
+    p_out
+        .set_item("frequency_hz", &cfg.source.freq_hz)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set frequency_hz: {}", e)))?;
+    p_out
+        .set_item("shape", (nfreq, nx, ny, nz))
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set shape: {}", e)))?;
+    p_out
+        .set_item("pressure_re", re_flat)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set pressure_re: {}", e)))?;
+    p_out
+        .set_item("pressure_im", im_flat)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set pressure_im: {}", e)))?;
+    p_out
+        .set_item("delay_s", delay_flat)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set delay_s: {}", e)))?;
+    p_out
+        .set_item("amplitude", amp_flat)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set amplitude: {}", e)))?;
 
-    Ok(py_obj.into())
+    out.set_item("pressure_field", p_out)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to set pressure_field: {}", e)))?;
+
+    Ok(out.into())
 }
 
 #[cfg(feature = "python")]

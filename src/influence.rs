@@ -150,24 +150,7 @@ pub fn gaussian_beam_influence(
         (e1_g[is], e2_g[is]) = crate::rays::ray_normal(ray.direction, ray.phi, ray.c);
     }
 
-    let mut cumulative_bottom_reflection: Vec<Vec<Complex32>> =
-        vec![vec![Complex32::new(1.0, 0.0); omega.len()]; n_steps];
-    for is in 1..n_steps {
-        cumulative_bottom_reflection[is] = cumulative_bottom_reflection[is - 1].clone();
-        if let Some(bottom_bounce) = ray_history[is].bottom_bounce {
-            for (ifreq, &angular_frequency_rad_s) in omega.iter().enumerate() {
-                let reflection = compute_bottom_reflection_coefficient(
-                    &bty_field.bottom_model,
-                    bty_field.water_density_g_cm3,
-                    bottom_bounce.water_sound_speed_m_s,
-                    bottom_bounce.incident_slowness,
-                    bottom_bounce.boundary_normal,
-                    angular_frequency_rad_s,
-                );
-                cumulative_bottom_reflection[is][ifreq] *= reflection;
-            }
-        }
-    }
+    let mut running_bottom_reflection = vec![Complex32::new(1.0, 0.0); omega.len()];
 
     // Pre-calc maximum gaussian radii for quick rejection (approx from q elements)
     let mut max_radius_a = vec![0.0f32; n_steps.saturating_sub(1)];
@@ -199,99 +182,114 @@ pub fn gaussian_beam_influence(
             let ray_end = ray_history[is].position;
             let ray_vec = sub(&ray_end, &ray_start);
             let ray_length_sq = dot(&ray_vec, &ray_vec);
-            if ray_length_sq < 1e-12 { continue; }
-            let seg_len = ray_length_sq.sqrt();
-            if seg_len <= 1e-4 { continue; }
+            if ray_length_sq >= 1e-12 {
+                let seg_len = ray_length_sq.sqrt();
+                if seg_len > 1e-4 {
+                    // beam radius estimate (use precomputed maxima)
+                    let mut beam_radius = 0.0_f32;
+                    if is - 1 < max_radius_a.len() && is - 1 < max_radius_b.len() {
+                        beam_radius = max_radius_a[is - 1].max(max_radius_b[is - 1]);
+                    }
+                    let half_len = 0.5 * seg_len;
+                    let search_radius = beam_radius + half_len + 1e-6_f32;
 
-            // beam radius estimate (use precomputed maxima)
-            let mut beam_radius = 0.0_f32;
-            if is - 1 < max_radius_a.len() && is - 1 < max_radius_b.len() {
-                beam_radius = max_radius_a[is - 1].max(max_radius_b[is - 1]);
-            }
-            let half_len = 0.5 * seg_len;
-            let search_radius = beam_radius + half_len + 1e-6_f32;
+                    // Use precomputed normals
+                    let e1 = e1_g[is];
+                    let e2 = e2_g[is];
 
-            // Use precomputed normals
-            let e1 = e1_g[is];
-            let e2 = e2_g[is];
+                    for irec in 0..nrec {
+                        let receiver_pos = recs[irec];
 
-            for irec in 0..nrec {
-                let receiver_pos = recs[irec];
+                        // Find closest point on ray segment to receiver
+                        let to_receiver = sub(&receiver_pos, &ray_start);
+                        let t_raw = dot(&to_receiver, &ray_vec) / ray_length_sq;
+                        if t_raw < 0.0 || t_raw > 1.0 { continue; }
+                        let t = t_raw;
+                        let closest_point = [
+                            ray_start[0] + t * ray_vec[0],
+                            ray_start[1] + t * ray_vec[1],
+                            ray_start[2] + t * ray_vec[2],
+                        ];
 
-                // Find closest point on ray segment to receiver
-                let to_receiver = sub(&receiver_pos, &ray_start);
-                let t_raw = dot(&to_receiver, &ray_vec) / ray_length_sq;
-                if t_raw < 0.0 || t_raw > 1.0 { continue; }
-                let t = t_raw;
-                let closest_point = [
-                    ray_start[0] + t * ray_vec[0],
-                    ray_start[1] + t * ray_vec[1],
-                    ray_start[2] + t * ray_vec[2],
-                ];
+                        let dx = receiver_pos[0] - closest_point[0];
+                        let dy = receiver_pos[1] - closest_point[1];
+                        let dz = receiver_pos[2] - closest_point[2];
+                        let dist_sq = dx*dx + dy*dy + dz*dz;
+                        if dist_sq > (search_radius * search_radius) { continue; }
 
-                let dx = receiver_pos[0] - closest_point[0];
-                let dy = receiver_pos[1] - closest_point[1];
-                let dz = receiver_pos[2] - closest_point[2];
-                let dist_sq = dx*dx + dy*dy + dz*dz;
-                if dist_sq > (search_radius * search_radius) { continue; }
+                        // Linear interpolation of q's at closest point
+                        let q_tilde = [
+                            ray_history[is - 1].q_tilde[0] + t * (ray_history[is].q_tilde[0] - ray_history[is - 1].q_tilde[0]),
+                            ray_history[is - 1].q_tilde[1] + t * (ray_history[is].q_tilde[1] - ray_history[is - 1].q_tilde[1]),
+                        ];
+                        let q_hat = [
+                            ray_history[is - 1].q_hat[0] + t * (ray_history[is].q_hat[0] - ray_history[is - 1].q_hat[0]),
+                            ray_history[is - 1].q_hat[1] + t * (ray_history[is].q_hat[1] - ray_history[is - 1].q_hat[1]),
+                        ];
 
-                // Linear interpolation of q's at closest point
-                let q_tilde = [
-                    ray_history[is - 1].q_tilde[0] + t * (ray_history[is].q_tilde[0] - ray_history[is - 1].q_tilde[0]),
-                    ray_history[is - 1].q_tilde[1] + t * (ray_history[is].q_tilde[1] - ray_history[is - 1].q_tilde[1]),
-                ];
-                let q_hat = [
-                    ray_history[is - 1].q_hat[0] + t * (ray_history[is].q_hat[0] - ray_history[is - 1].q_hat[0]),
-                    ray_history[is - 1].q_hat[1] + t * (ray_history[is].q_hat[1] - ray_history[is - 1].q_hat[1]),
-                ];
+                        let det_q_int = q_tilde[0] * q_hat[1] - q_hat[0] * q_tilde[1];
+                        if det_q_int.abs() < 1e-12 { continue; }
 
-                let det_q_int = q_tilde[0] * q_hat[1] - q_hat[0] * q_tilde[1];
-                if det_q_int.abs() < 1e-12 { continue; }
+                        let offset = sub(&receiver_pos, &closest_point);
+                        let n = dot(&offset, &e1).abs();
+                        let m = dot(&offset, &e2).abs();
 
-                let offset = sub(&receiver_pos, &closest_point);
-                let n = dot(&offset, &e1).abs();
-                let m = dot(&offset, &e2).abs();
+                        let a = if q_hat[1].abs() > 1e-12 {
+                            ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs()
+                        } else {
+                            (m / det_q_int.abs()).abs()
+                        };
+                        let b = if q_tilde[0].abs() > 1e-12 {
+                            ((q_tilde[0] * m - q_tilde[1] * n) / det_q_int).abs()
+                        } else {
+                            (n / det_q_int.abs()).abs()
+                        };
 
-                let a = if q_hat[1].abs() > 1e-12 {
-                    ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs()
-                } else {
-                    (m / det_q_int.abs()).abs()
-                };
-                let b = if q_tilde[0].abs() > 1e-12 {
-                    ((q_tilde[0] * m - q_tilde[1] * n) / det_q_int).abs()
-                } else {
-                    (n / det_q_int.abs()).abs()
-                };
+                        if a + b > beam_window { continue; }
+                        let w = (-0.5_f32 * (a * a + b * b)).exp();
+                        let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
+                        let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
+                        let amp = const_amp * w;
 
-                if a + b > beam_window { continue; }
-                let w = (-0.5_f32 * (a * a + b * b)).exp();
-                let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
-                let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
-                let amp = const_amp * w;
+                        let mut phase_int = ray_history[is - 1].phase + kmah_phase[is - 1];
+                        let det_q_prev = ray_history[is - 1].det_q;
+                        if (det_q_int <= 0.0 && det_q_prev > 0.0) || (det_q_int >= 0.0 && det_q_prev < 0.0) {
+                            phase_int += PI / 2.0;
+                        }
 
-                let mut phase_int = ray_history[is - 1].phase + kmah_phase[is - 1];
-                let det_q_prev = ray_history[is - 1].det_q;
-                if (det_q_int <= 0.0 && det_q_prev > 0.0) || (det_q_int >= 0.0 && det_q_prev < 0.0) {
-                    phase_int += PI / 2.0;
-                }
+                        // update earliest arrival for this receiver index
+                        {
+                            let cur_delay = pressure_field.delay_s[(irec, 0, 0)];
+                            let cur_amp = pressure_field.amplitude[(irec, 0, 0)];
+                            if delay < cur_delay || (delay == cur_delay && amp.abs() > cur_amp.abs()) {
+                                pressure_field.delay_s[(irec, 0, 0)] = delay;
+                                pressure_field.amplitude[(irec, 0, 0)] = amp;
+                            }
+                        }
 
-                // update earliest arrival for this receiver index
-                {
-                    let cur_delay = pressure_field.delay_s[(irec, 0, 0)];
-                    let cur_amp = pressure_field.amplitude[(irec, 0, 0)];
-                    if delay < cur_delay || (delay == cur_delay && amp.abs() > cur_amp.abs()) {
-                        pressure_field.delay_s[(irec, 0, 0)] = delay;
-                        pressure_field.amplitude[(irec, 0, 0)] = amp;
+                        // accumulate pressure for each frequency into (nfreq, irec, 0, 0)
+                        for (ifreq, &om) in omega.iter().enumerate() {
+                            let phase = om * delay - phase_int;
+                            let (s, c) = phase.sin_cos();
+                            let base_contribution = Complex32::new(amp * c, amp * s);
+                            let contribution = running_bottom_reflection[ifreq] * base_contribution;
+                            pressure_field.pressure[[ifreq, irec, 0, 0]] += contribution;
+                        }
                     }
                 }
+            }
 
-                // accumulate pressure for each frequency into (nfreq, irec, 0, 0)
-                for (ifreq, &om) in omega.iter().enumerate() {
-                    let phase = om * delay - phase_int;
-                    let (s, c) = phase.sin_cos();
-                    let base_contribution = Complex32::new(amp * c, amp * s);
-                    let contribution = cumulative_bottom_reflection[is - 1][ifreq] * base_contribution;
-                    pressure_field.pressure[[ifreq, irec, 0, 0]] += contribution;
+            if let Some(bottom_bounce) = ray_history[is].bottom_bounce {
+                for (ifreq, &angular_frequency_rad_s) in omega.iter().enumerate() {
+                    let reflection = compute_bottom_reflection_coefficient(
+                        &bty_field.bottom_model,
+                        bty_field.water_density_g_cm3,
+                        bottom_bounce.water_sound_speed_m_s,
+                        bottom_bounce.incident_slowness,
+                        bottom_bounce.boundary_normal,
+                        angular_frequency_rad_s,
+                    );
+                    running_bottom_reflection[ifreq] *= reflection;
                 }
             }
         }
@@ -321,136 +319,150 @@ pub fn gaussian_beam_influence(
         let ray_vec = sub(&ray_end, &ray_start);
         let ray_length_sq = dot(&ray_vec, &ray_vec);
         // skip degenerate/very short segments
-        if ray_length_sq < 1e-12 { continue; }
-        let seg_len = ray_length_sq.sqrt();
-        if seg_len <= 1e-4 { continue; }
+        if ray_length_sq >= 1e-12 {
+            let seg_len = ray_length_sq.sqrt();
+            if seg_len > 1e-4 {
+                // beam radius estimate (use precomputed maxima)
+                let mut beam_radius = 0.0_f32;
+                if is - 1 < max_radius_a.len() && is - 1 < max_radius_b.len() {
+                    beam_radius = max_radius_a[is - 1].max(max_radius_b[is - 1]);
+                }
+                // Use a conservative radius including half-segment length
+                let half_len = 0.5 * seg_len;
+                let search_radius = beam_radius + half_len + 1e-6_f32;
 
-        // beam radius estimate (use precomputed maxima)
-        let mut beam_radius = 0.0_f32;
-        if is - 1 < max_radius_a.len() && is - 1 < max_radius_b.len() {
-            beam_radius = max_radius_a[is - 1].max(max_radius_b[is - 1]);
-        }
-        // Use a conservative radius including half-segment length
-        let half_len = 0.5 * seg_len;
-        let search_radius = beam_radius + half_len + 1e-6_f32;
+                // AABB of the segment inflated by search_radius
+                let min_x = ray_start[0].min(ray_end[0]) - search_radius;
+                let max_x = ray_start[0].max(ray_end[0]) + search_radius;
+                let min_y = ray_start[1].min(ray_end[1]) - search_radius;
+                let max_y = ray_start[1].max(ray_end[1]) + search_radius;
+                let min_z = ray_start[2].min(ray_end[2]) - search_radius;
+                let max_z = ray_start[2].max(ray_end[2]) + search_radius;
 
-        // AABB of the segment inflated by search_radius
-        let min_x = ray_start[0].min(ray_end[0]) - search_radius;
-        let max_x = ray_start[0].max(ray_end[0]) + search_radius;
-        let min_y = ray_start[1].min(ray_end[1]) - search_radius;
-        let max_y = ray_start[1].max(ray_end[1]) + search_radius;
-        let min_z = ray_start[2].min(ray_end[2]) - search_radius;
-        let max_z = ray_start[2].max(ray_end[2]) + search_radius;
+                let x_range = find_index_range(&pressure_field.x_m, min_x, max_x);
+                let y_range = find_index_range(&pressure_field.y_m, min_y, max_y);
+                let z_range = find_index_range(&pressure_field.z_m, min_z, max_z);
 
-        let x_range = match find_index_range(&pressure_field.x_m, min_x, max_x) { None => continue, Some(r) => r };
-        let y_range = match find_index_range(&pressure_field.y_m, min_y, max_y) { None => continue, Some(r) => r };
-        let z_range = match find_index_range(&pressure_field.z_m, min_z, max_z) { None => continue, Some(r) => r };
+                if let (Some(x_range), Some(y_range), Some(z_range)) = (x_range, y_range, z_range) {
+                    // Use precomputed normals
+                    let e1 = e1_g[is];
+                    let e2 = e2_g[is];
 
-        // Use precomputed normals
-        let e1 = e1_g[is];
-        let e2 = e2_g[is];
+                    // iterate only candidate receivers
+                    for ix in x_range.0..=x_range.1 {
+                        let x_rcvr = pressure_field.x_m[ix];
+                        for iy in y_range.0..=y_range.1 {
+                            let y_rcvr = pressure_field.y_m[iy];
+                            for iz in z_range.0..=z_range.1 {
+                                let z_rcvr = pressure_field.z_m[iz];
 
-        // iterate only candidate receivers
-        for ix in x_range.0..=x_range.1 {
-            let x_rcvr = pressure_field.x_m[ix];
-            for iy in y_range.0..=y_range.1 {
-                let y_rcvr = pressure_field.y_m[iy];
-                for iz in z_range.0..=z_range.1 {
-                    let z_rcvr = pressure_field.z_m[iz];
+                                let receiver_pos = [x_rcvr, y_rcvr, z_rcvr];
 
-                    let receiver_pos = [x_rcvr, y_rcvr, z_rcvr];
+                                // Find closest point on ray segment to receiver
+                                let to_receiver = sub(&receiver_pos, &ray_start);
+                                let t_raw = dot(&to_receiver, &ray_vec) / ray_length_sq;
+                                // reject contributions from projections outside the segment (no backward extrapolation)
+                                if t_raw < 0.0 || t_raw > 1.0 { continue; }
+                                let t = t_raw;
+                                let closest_point = [
+                                    ray_start[0] + t * ray_vec[0],
+                                    ray_start[1] + t * ray_vec[1],
+                                    ray_start[2] + t * ray_vec[2],
+                                ];
 
-                    // Find closest point on ray segment to receiver
-                    let to_receiver = sub(&receiver_pos, &ray_start);
-                    let t_raw = dot(&to_receiver, &ray_vec) / ray_length_sq;
-                    // reject contributions from projections outside the segment (no backward extrapolation)
-                    if t_raw < 0.0 || t_raw > 1.0 { continue; }
-                    let t = t_raw;
-                    let closest_point = [
-                        ray_start[0] + t * ray_vec[0],
-                        ray_start[1] + t * ray_vec[1],
-                        ray_start[2] + t * ray_vec[2],
-                    ];
+                                // squared distance quick reject
+                                let dx = receiver_pos[0] - closest_point[0];
+                                let dy = receiver_pos[1] - closest_point[1];
+                                let dz = receiver_pos[2] - closest_point[2];
+                                let dist_sq = dx*dx + dy*dy + dz*dz;
+                                if dist_sq > (search_radius * search_radius) { continue; }
 
-                    // squared distance quick reject
-                    let dx = receiver_pos[0] - closest_point[0];
-                    let dy = receiver_pos[1] - closest_point[1];
-                    let dz = receiver_pos[2] - closest_point[2];
-                    let dist_sq = dx*dx + dy*dy + dz*dz;
-                    if dist_sq > (search_radius * search_radius) { continue; }
+                                // Linear interpolation of q's at closest point
+                                let q_tilde = [
+                                    ray_history[is - 1].q_tilde[0] + t * (ray_history[is].q_tilde[0] - ray_history[is - 1].q_tilde[0]),
+                                    ray_history[is - 1].q_tilde[1] + t * (ray_history[is].q_tilde[1] - ray_history[is - 1].q_tilde[1]),
+                                ];
+                                let q_hat = [
+                                    ray_history[is - 1].q_hat[0] + t * (ray_history[is].q_hat[0] - ray_history[is - 1].q_hat[0]),
+                                    ray_history[is - 1].q_hat[1] + t * (ray_history[is].q_hat[1] - ray_history[is - 1].q_hat[1]),
+                                ];
 
-                    // Linear interpolation of q's at closest point
-                    let q_tilde = [
-                        ray_history[is - 1].q_tilde[0] + t * (ray_history[is].q_tilde[0] - ray_history[is - 1].q_tilde[0]),
-                        ray_history[is - 1].q_tilde[1] + t * (ray_history[is].q_tilde[1] - ray_history[is - 1].q_tilde[1]),
-                    ];
-                    let q_hat = [
-                        ray_history[is - 1].q_hat[0] + t * (ray_history[is].q_hat[0] - ray_history[is - 1].q_hat[0]),
-                        ray_history[is - 1].q_hat[1] + t * (ray_history[is].q_hat[1] - ray_history[is - 1].q_hat[1]),
-                    ];
+                                // Determinant of the ray tube
+                                let det_q_int = q_tilde[0] * q_hat[1] - q_hat[0] * q_tilde[1];
+                                if det_q_int.abs() < 1e-12 { continue; }
 
-                    // Determinant of the ray tube
-                    let det_q_int = q_tilde[0] * q_hat[1] - q_hat[0] * q_tilde[1];
-                    if det_q_int.abs() < 1e-12 { continue; }
+                                // Beam coordinates using local normals
+                                let offset = sub(&receiver_pos, &closest_point);
+                                let n = dot(&offset, &e1).abs();
+                                let m = dot(&offset, &e2).abs();
 
-                    // Beam coordinates using local normals
-                    let offset = sub(&receiver_pos, &closest_point);
-                    // let m = dot(&offset, &e1).abs();
-                    // let n = dot(&offset, &e2).abs();
-                    let n = dot(&offset, &e1).abs();
-                    let m = dot(&offset, &e2).abs();
+                                let a = if q_hat[1].abs() > 1e-12 {
+                                    ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs()
+                                } else {
+                                    (m / det_q_int.abs()).abs()
+                                };
+                                let b = if q_tilde[0].abs() > 1e-12 {
+                                    ((q_tilde[0] * m - q_tilde[1] * n) / det_q_int).abs()
+                                } else {
+                                    (n / det_q_int.abs()).abs()
+                                };
 
-                    let a = if q_hat[1].abs() > 1e-12 {
-                        ((- q_hat[0] * m + q_hat[1] * n) / det_q_int).abs()
-                    } else {
-                        (m / det_q_int.abs()).abs()
-                    };
-                    let b = if q_tilde[0].abs() > 1e-12 {
-                        ((q_tilde[0] * m - q_tilde[1] * n) / det_q_int).abs()
-                    } else {
-                        (n / det_q_int.abs()).abs()
-                    };
+                                if a + b > beam_window { continue; }
 
-                    if a + b > beam_window { continue; }
+                                // Gaussian weight
+                                let w = (-0.5_f32 * (a * a + b * b)).exp();
 
-                    // Gaussian weight
-                    let w = (-0.5_f32 * (a * a + b * b)).exp();
+                                // Travel time to closest point
+                                let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
 
-                    // Travel time to closest point
-                    let delay = ray_history[is - 1].travel_time + t * (ray_history[is].travel_time - ray_history[is - 1].travel_time);
-                    // println!("amp = {}, delay = {}", ray_history[is - 1].amplitude, delay);
+                                let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
+                                let amp = const_amp * w;
 
-                    let const_amp = ray_history[is].amplitude / det_q_int.abs().sqrt();
-                    let amp = const_amp * w;
+                                // Phase shift at caustics
+                                let mut phase_int = ray_history[is - 1].phase + kmah_phase[is - 1];
+                                let det_q_prev = ray_history[is - 1].det_q;
+                                if (det_q_int <= 0.0 && det_q_prev > 0.0) || (det_q_int >= 0.0 && det_q_prev < 0.0) {
+                                    phase_int += PI / 2.0;
+                                }
 
-                    // Phase shift at caustics
-                    let mut phase_int = ray_history[is - 1].phase + kmah_phase[is - 1];
-                    let det_q_prev = ray_history[is - 1].det_q;
-                    if (det_q_int <= 0.0 && det_q_prev > 0.0) || (det_q_int >= 0.0 && det_q_prev < 0.0) {
-                        phase_int += PI / 2.0;
-                    }
+                                // Record per-receiver earliest-arrival delay and corresponding amplitude
+                                // If this contribution arrives earlier than stored delay, replace; if equal delay, keep larger amplitude
+                                {
+                                    let cur_delay = pressure_field.delay_s[(ix, iy, iz)];
+                                    let cur_amp = pressure_field.amplitude[(ix, iy, iz)];
+                                    // choose update when delay is smaller (earlier) or if equal delay but amplitude larger
+                                    if delay < cur_delay || (delay == cur_delay && amp.abs() > cur_amp.abs()) {
+                                        pressure_field.delay_s[(ix, iy, iz)] = delay;
+                                        pressure_field.amplitude[(ix, iy, iz)] = amp;
+                                    }
+                                }
 
-                    // Record per-receiver earliest-arrival delay and corresponding amplitude
-                    // If this contribution arrives earlier than stored delay, replace; if equal delay, keep larger amplitude
-                    {
-                        let cur_delay = pressure_field.delay_s[(ix, iy, iz)];
-                        let cur_amp = pressure_field.amplitude[(ix, iy, iz)];
-                        // choose update when delay is smaller (earlier) or if equal delay but amplitude larger
-                        if delay < cur_delay || (delay == cur_delay && amp.abs() > cur_amp.abs()) {
-                            pressure_field.delay_s[(ix, iy, iz)] = delay;
-                            pressure_field.amplitude[(ix, iy, iz)] = amp;
+                                // Loop over frequencies and accumulate into 4D pressure field
+                                for (ifreq, &om) in omega.iter().enumerate() {
+                                    let phase = om * delay - phase_int;
+                                    let (s, c) = phase.sin_cos();
+                                    let base_contribution = Complex32::new(amp * c, amp * s);
+                                    let contribution = running_bottom_reflection[ifreq] * base_contribution;
+                                    pressure_field.pressure[[ifreq, ix, iy, iz]] += contribution;
+                                }
+                            }
                         }
                     }
-
-                    // Loop over frequencies and accumulate into 4D pressure field
-                    for (ifreq, &om) in omega.iter().enumerate() {
-                        let phase = om * delay - phase_int;
-                        let (s, c) = phase.sin_cos();
-                        let base_contribution = Complex32::new(amp * c, amp * s);
-                        let contribution = cumulative_bottom_reflection[is - 1][ifreq] * base_contribution;
-                        pressure_field.pressure[[ifreq, ix, iy, iz]] += contribution;
-                    }
                 }
+            }
+        }
+
+        if let Some(bottom_bounce) = ray_history[is].bottom_bounce {
+            for (ifreq, &angular_frequency_rad_s) in omega.iter().enumerate() {
+                let reflection = compute_bottom_reflection_coefficient(
+                    &bty_field.bottom_model,
+                    bty_field.water_density_g_cm3,
+                    bottom_bounce.water_sound_speed_m_s,
+                    bottom_bounce.incident_slowness,
+                    bottom_bounce.boundary_normal,
+                    angular_frequency_rad_s,
+                );
+                running_bottom_reflection[ifreq] *= reflection;
             }
         }
     }

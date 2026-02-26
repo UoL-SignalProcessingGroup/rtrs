@@ -1,85 +1,233 @@
 use anyhow::Result;
-use serde_json::{json, Value};
-use std::fs;
+use ndarray::{Array3, Array4};
+use num_complex::Complex32;
+use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{Serialize, Serializer};
+use std::fs::File;
+use std::io::BufWriter;
 
 use crate::input::config::SimulationConfig;
 use crate::influence::PressureField;
 
-pub fn write_json(file_path: &str, simulation_config: &SimulationConfig, ray_paths: Vec<Vec<[f32; 3]>>, pressure_field: PressureField) -> Result<()> {
+struct RayPathsOut<'a> {
+    ray_paths: &'a [Vec<[f32; 3]>],
+}
 
-    // Build ray_paths object: { "ray_0": [[x,y,z], ...], ... }
-    let mut ray_paths_obj = serde_json::Map::new();
-    for (i, path) in ray_paths.iter().enumerate() {
-        let key = format!("ray_{}", i);
-        let pts: Vec<Value> = path.iter().map(|pt| json!([pt[0], pt[1], pt[2]])).collect();
-        ray_paths_obj.insert(key, Value::Array(pts));
+impl Serialize for RayPathsOut<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.ray_paths.len()))?;
+        for (i, path) in self.ray_paths.iter().enumerate() {
+            map.serialize_entry(&format!("ray_{}", i), path)?;
+        }
+        SerializeMap::end(map)
     }
+}
 
-    // Flatten pressure field real/imag parts from Array4<Complex32> (nfreq, nx, ny, nz)
-    let shape = pressure_field.pressure.dim();
-    let (nfreq, nx, ny, nz) = (shape.0, shape.1, shape.2, shape.3);
-    let mut re_flat: Vec<f32> = Vec::with_capacity(nfreq * nx * ny * nz);
-    let mut im_flat: Vec<f32> = Vec::with_capacity(nfreq * nx * ny * nz);
-    for ifreq in 0..nfreq {
-        for ix in 0..nx {
-            for iy in 0..ny {
-                for iz in 0..nz {
-                    let v = pressure_field.pressure[(ifreq, ix, iy, iz)];
-                    re_flat.push(v.re);
-                    im_flat.push(v.im);
+struct FlatArray3<'a> {
+    array: &'a Array3<f32>,
+}
+
+impl Serialize for FlatArray3<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let (nx, ny, nz) = self.array.dim();
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("shape", &[nx, ny, nz])?;
+
+        struct Data<'a> {
+            array: &'a Array3<f32>,
+        }
+        impl Serialize for Data<'_> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let (nx, ny, nz) = self.array.dim();
+                let mut seq = serializer.serialize_seq(Some(nx * ny * nz))?;
+                for ix in 0..nx {
+                    for iy in 0..ny {
+                        for iz in 0..nz {
+                            seq.serialize_element(&self.array[(ix, iy, iz)])?;
+                        }
+                    }
                 }
+                SerializeSeq::end(seq)
             }
         }
-    }
 
-    // Flatten delay_s and amplitude from Array3<f32> (nx, ny, nz)
-    let dshape = pressure_field.delay_s.dim();
-    let (dnx, dny, dnz) = (dshape.0, dshape.1, dshape.2);
-    let mut delay_flat: Vec<f32> = Vec::with_capacity(dnx * dny * dnz);
-    let mut amp_flat: Vec<f32> = Vec::with_capacity(dnx * dny * dnz);
-    for ix in 0..dnx {
-        for iy in 0..dny {
-            for iz in 0..dnz {
-                delay_flat.push(pressure_field.delay_s[(ix, iy, iz)]);
-                amp_flat.push(pressure_field.amplitude[(ix, iy, iz)]);
+        map.serialize_entry("data", &Data { array: self.array })?;
+        SerializeMap::end(map)
+    }
+}
+
+struct FlatArray4Complex<'a> {
+    array: &'a Array4<Complex32>,
+    imag: bool,
+}
+
+impl Serialize for FlatArray4Complex<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let (nfreq, nx, ny, nz) = self.array.dim();
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("shape", &[nfreq, nx, ny, nz])?;
+
+        struct Data<'a> {
+            array: &'a Array4<Complex32>,
+            imag: bool,
+        }
+        impl Serialize for Data<'_> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let (nfreq, nx, ny, nz) = self.array.dim();
+                let mut seq = serializer.serialize_seq(Some(nfreq * nx * ny * nz))?;
+                for ifreq in 0..nfreq {
+                    for ix in 0..nx {
+                        for iy in 0..ny {
+                            for iz in 0..nz {
+                                let v = self.array[(ifreq, ix, iy, iz)];
+                                let x = if self.imag { v.im } else { v.re };
+                                seq.serialize_element(&x)?;
+                            }
+                        }
+                    }
+                }
+                SerializeSeq::end(seq)
             }
         }
+
+        map.serialize_entry(
+            "data",
+            &Data {
+                array: self.array,
+                imag: self.imag,
+            },
+        )?;
+        SerializeMap::end(map)
+    }
+}
+
+struct PressureFieldOut<'a> {
+    simulation_config: &'a SimulationConfig,
+    pressure_field: &'a PressureField,
+}
+
+#[derive(Serialize)]
+struct SrcOut<'a> {
+    frequency_hz: &'a Vec<f32>,
+    source_position_m: [f32; 3],
+    launch_elev_deg: &'a Vec<f32>,
+    launch_azim_deg: &'a Vec<f32>,
+}
+
+#[derive(Serialize)]
+struct BtyOut<'a> {
+    x_bty_m: &'a Vec<f32>,
+    y_bty_m: &'a Vec<f32>,
+    z_bty_m: &'a Vec<f32>,
+}
+
+impl Serialize for PressureFieldOut<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("frequency_hz", &self.simulation_config.source.freq_hz)?;
+
+        if self.pressure_field.is_array {
+            let recs = self
+                .pressure_field
+                .receiver_positions_m
+                .as_ref()
+                .expect("receiver_positions_m present for array mode");
+            map.serialize_entry("receiver_positions_m", recs)?;
+        } else {
+            map.serialize_entry("x_m", &self.pressure_field.x_m)?;
+            map.serialize_entry("y_m", &self.pressure_field.y_m)?;
+            map.serialize_entry("z_m", &self.pressure_field.z_m)?;
+        }
+
+        map.serialize_entry(
+            "delay_s",
+            &FlatArray3 {
+                array: &self.pressure_field.delay_s,
+            },
+        )?;
+        map.serialize_entry(
+            "amplitude",
+            &FlatArray3 {
+                array: &self.pressure_field.amplitude,
+            },
+        )?;
+        map.serialize_entry(
+            "pressure_re",
+            &FlatArray4Complex {
+                array: &self.pressure_field.pressure,
+                imag: false,
+            },
+        )?;
+        map.serialize_entry(
+            "pressure_im",
+            &FlatArray4Complex {
+                array: &self.pressure_field.pressure,
+                imag: true,
+            },
+        )?;
+        SerializeMap::end(map)
+    }
+}
+
+pub fn write_json(
+    file_path: &str,
+    simulation_config: &SimulationConfig,
+    ray_paths: Option<&Vec<Vec<[f32; 3]>>>,
+    pressure_field: &PressureField,
+) -> Result<()> {
+    let file = File::create(file_path)?;
+    let writer = BufWriter::new(file);
+    let mut serializer = serde_json::Serializer::new(writer);
+
+    let mut root = serializer.serialize_map(None)?;
+    root.serialize_entry(
+        "src",
+        &SrcOut {
+            frequency_hz: &simulation_config.source.freq_hz,
+            source_position_m: simulation_config.source.position,
+            launch_elev_deg: &simulation_config.source.launch_elev_deg,
+            launch_azim_deg: &simulation_config.source.launch_azim_deg,
+        },
+    )?;
+
+    if let Some(ray_paths) = ray_paths {
+        root.serialize_entry("ray_paths", &RayPathsOut { ray_paths })?;
     }
 
-    // Build pressure_field section
-    let mut pf_obj = serde_json::Map::new();
-    pf_obj.insert("frequency_hz".into(), json!(simulation_config.source.freq_hz));
-    if pressure_field.is_array {
-        let recs = pressure_field.receiver_positions_m.as_ref()
-            .expect("receiver_positions_m present for array mode");
-        let recs_val: Vec<Value> = recs.iter().map(|r| json!([r[0], r[1], r[2]])).collect();
-        pf_obj.insert("receiver_positions_m".into(), Value::Array(recs_val));
-    } else {
-        pf_obj.insert("x_m".into(), json!(pressure_field.x_m));
-        pf_obj.insert("y_m".into(), json!(pressure_field.y_m));
-        pf_obj.insert("z_m".into(), json!(pressure_field.z_m));
-    }
-    pf_obj.insert("delay_s".into(), json!({ "shape": [dnx, dny, dnz], "data": delay_flat }));
-    pf_obj.insert("amplitude".into(), json!({ "shape": [dnx, dny, dnz], "data": amp_flat }));
-    pf_obj.insert("pressure_re".into(), json!({ "shape": [nfreq, nx, ny, nz], "data": re_flat }));
-    pf_obj.insert("pressure_im".into(), json!({ "shape": [nfreq, nx, ny, nz], "data": im_flat }));
-
-    let output = json!({
-        "src": {
-            "frequency_hz": simulation_config.source.freq_hz,
-            "source_position_m": simulation_config.source.position,
-            "launch_elev_deg": simulation_config.source.launch_elev_deg,
-            "launch_azim_deg": simulation_config.source.launch_azim_deg
+    root.serialize_entry(
+        "bty",
+        &BtyOut {
+            x_bty_m: &simulation_config.bathymetry.x_bty_m,
+            y_bty_m: &simulation_config.bathymetry.y_bty_m,
+            z_bty_m: &simulation_config.bathymetry.z_bty_m,
         },
-        "ray_paths": Value::Object(ray_paths_obj),
-        "bty": {
-            "x_bty_m": simulation_config.bathymetry.x_bty_m,
-            "y_bty_m": simulation_config.bathymetry.y_bty_m,
-            "z_bty_m": simulation_config.bathymetry.z_bty_m
+    )?;
+    root.serialize_entry(
+        "pressure_field",
+        &PressureFieldOut {
+            simulation_config,
+            pressure_field,
         },
-        "pressure_field": Value::Object(pf_obj)
-    });
+    )?;
+    SerializeMap::end(root)?;
 
-    fs::write(file_path, serde_json::to_string(&output)?)?;
     Ok(())
 }

@@ -46,7 +46,7 @@ fn main() -> Result<()> {
 
     // Write JSON output
     let out_path_str = out_path.to_str().expect("Invalid output path");
-    write_json(out_path_str, &config, ray_paths, pressure_field)?;
+    write_json(out_path_str, &config, ray_paths.as_ref(), &pressure_field)?;
     Ok(())
 }
 

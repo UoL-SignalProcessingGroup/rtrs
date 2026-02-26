@@ -37,7 +37,7 @@ env_m = {
             "compressional_speed_m_s": 1700.0,
             "shear_speed_m_s": 400.0,
             "density_g_cm3": 1.6,
-            "compressional_attenuation_db_per_wavelength": 5.0,
+            "compressional_attenuation_db_per_wavelength": 0.5,
             "shear_attenuation_db_per_wavelength": 0.35
         }
     },
@@ -56,7 +56,8 @@ env_m = {
     "beam": {
         "step_m": 10.0,
         "max_steps": 100_000,
-        "max_range_m": 50_000.0
+        "max_range_m": 50_000.0,
+        "store_ray_paths": False
     }
 }
 
@@ -70,14 +71,14 @@ t1 = time.time()
 print(f"completed in {t1 - t0:.2f} seconds.")
 
 
-rays = python_utils.load_rays(outfile)
+# rays = python_utils.load_rays(outfile)
 x_bty, y_bty, z_bty = python_utils.load_bty(outfile)
 freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(outfile)
 pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
 tl = -20 * np.log10(np.maximum(np.abs(pressure), 1e-30))
 
-python_utils.plot_rays_xz(rays)
-python_utils.plot_rays_yz(rays)
+# python_utils.plot_rays_xz(rays)
+# python_utils.plot_rays_yz(rays)
 
 z_val = 1000.0
 z_idx = (np.abs(z_m - z_val)).argmin()
@@ -86,4 +87,6 @@ python_utils.plot_line_tl_y(tl[0, :, :, :], x_m, y_m, z_m,
 python_utils.plot_tl_yz(tl[0, :, :, :], x_m, y_m, z_m, x_idx=len(x_m) // 2)
 python_utils.plot_pressure_yz(np.real(pressure[0, :, :, :]), x_m, y_m, z_m,
                                x_idx=len(x_m) // 2)
+
+
 plt.show()
