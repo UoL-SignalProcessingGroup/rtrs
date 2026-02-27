@@ -125,7 +125,7 @@ pub fn gaussian_beam_influence(
     let n_steps = ray_history.len();
     if n_steps < 2 { return; }
 
-    // Constants and beam window similar to Fortran implementation
+    // Constants and beam window similar to Bellhop implementation
     let beam_window = 4.0_f32; // kills beams outside exp(-0.5 * BeamWindow^2)
 
     // Scale the beam (note: scale_beam applies geometric scaling)
@@ -312,6 +312,7 @@ pub fn gaussian_beam_influence(
         Some((lo, hi))
     };
 
+    // grid mode
     for is in 1..n_steps {
         // Precompute per-segment values
         let ray_start = ray_history[is - 1].position;

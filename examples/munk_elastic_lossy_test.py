@@ -33,6 +33,7 @@ env_m = {
                               [5000.0, 5000.0]]).flatten(order='C').tolist(),
         "water_density_g_cm3": 1.0,
         "bottom_model": {
+            # "model": "rigid",
             "model": "elastic",
             "compressional_speed_m_s": 1700.0,
             "shear_speed_m_s": 400.0,
@@ -52,8 +53,8 @@ env_m = {
         "config_type": "grid",
         "x_rcvr_m": [0.0],
         # "x_rcvr_m": np.full(250,0.0).tolist(),
-        "y_rcvr_m": np.linspace(0.0, 50000.0, 150).tolist(),
-        "z_rcvr_m": np.linspace(0.0, 5000.0, 150).tolist()
+        "y_rcvr_m": np.linspace(0.0, 50000.0, 450).tolist(),
+        "z_rcvr_m": np.linspace(0.0, 5000.0, 450).tolist()
     },
     "beam": {
         "step_m": 10.0,

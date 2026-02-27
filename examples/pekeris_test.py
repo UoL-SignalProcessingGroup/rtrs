@@ -39,9 +39,9 @@ env_p = {
     "source": {
         "position": [0.0, 0.0, 25.0],
         "freq_hz": [50.0],
-        "launch_elev_deg": np.linspace(-15.0, 15.0, 300).tolist(),
-        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
-        # "launch_azim_deg": [0.0]
+        "launch_elev_deg": np.linspace(-15.0, 15.0, 500).tolist(),
+        # "launch_azim_deg": np.linspace(-1.0, 1.0, 3).tolist()
+        "launch_azim_deg": [0.0]
     },
     "receivers": {
         "config_type": "grid",
@@ -50,9 +50,10 @@ env_p = {
         "z_rcvr_m": np.linspace(0.0, 100.0, 100).tolist()
     },
     "beam": {
-        "step_m": 15.0,
-        "max_steps": 40_000,
-        "max_range_m": 30_000.0
+        "step_m": 20.0,
+        "max_steps": 500_000,
+        "max_range_m": 30_000.0,
+        "store_ray_paths": False,
     }
 }
 
@@ -62,22 +63,22 @@ with open(jsonfile, "w") as f:
 
 os.system(f"cargo run --release  {jsonfile}")
 
-rays = python_utils.load_rays(outfile)
+# rays = python_utils.load_rays(outfile)
 x_bty, y_bty, z_bty = python_utils.load_bty(outfile)
 freq, x_m, y_m, z_m, pressure = python_utils.load_cmpx_pressure(outfile)
 pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
 tl = - 20 * np.log10(np.abs(pressure))
 
 
-python_utils.plot_rays_xz(rays)
-python_utils.plot_rays_yz(rays)
+# python_utils.plot_rays_xz(rays)
+# python_utils.plot_rays_yz(rays)
 # python_utils.plot_rays_xy(rays)
 # python_utils.plot_rays_3d(rays)
 # python_utils.plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
-python_utils.plot_line_tl_x(tl[0,:,:,:], x_m, y_m, z_m, y_idx=len(y_m)//2, z_idx=len(z_m)//2)
+# python_utils.plot_line_tl_x(tl[0,:,:,:], x_m, y_m, z_m, y_idx=len(y_m)//2, z_idx=len(z_m)//2)
 python_utils.plot_line_tl_y(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, z_idx=len(z_m)//2)
-python_utils.plot_line_tl_z(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
-python_utils.plot_tl_yz(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2)
-python_utils.plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=-1, y_idx=-1, z_idx=len(z_m)//2)
+# python_utils.plot_line_tl_z(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, y_idx=len(y_m)//2)
+python_utils.plot_tl_yz(tl[0,:,:,:], x_m, y_m, z_m, x_idx=len(x_m)//2, vmax=120)
+# python_utils.plot_pressure_freq(pressure, freq, x_m, y_m, z_m, x_idx=-1, y_idx=-1, z_idx=len(z_m)//2)
 plt.show()  
 

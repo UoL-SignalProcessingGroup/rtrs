@@ -145,7 +145,8 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
     let q_tilde_in = [rot11 * ray.q_tilde[0] + rot12 * ray.q_hat[0], rot11 * ray.q_tilde[1] + rot12 * ray.q_hat[1]];
     let q_hat_in   = [rot21 * ray.q_tilde[0] + rot22 * ray.q_hat[0], rot21 * ray.q_tilde[1] + rot22 * ray.q_hat[1]];
 
-    // curvature corrections R1,R2,R3 are model-dependent; skip them (set 0) per instruction
+    // bellhop has model-dependent curvature corrections
+    // curvature corrections R1,R2,R3 are model-dependent;
     let r1 = 0.0_f32;
     let r2 = 0.0_f32;
     let r3 = 0.0_f32;
