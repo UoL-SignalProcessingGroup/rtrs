@@ -31,8 +31,6 @@ env_bty = {
         "c_m_s": list(ssp_pekeris_3d_flat)
     },
     "bathymetry": {
-        "kind": "tabulated",
-        "flat_depth_m": None,
         "x_bty_m": list(x_bty),
         "y_bty_m": list(y_bty),
         "z_bty_m": list(z_bty_flat),
