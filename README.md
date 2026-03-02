@@ -1,12 +1,12 @@
 # rtrs
 
-Underwater acoustic ray tracing in Rust.
+3D Underwater acoustic ray tracing in Rust.
 
 ## Current Features
 - 3D ray / beam tracing
 - Surface (vacuum) and bottom (rigid, lossy acoustic, lossy elastic) reflections
-- 3D sound speed profiles ($c(x,y,z)$)
-- 2D bathymetry ($b(x,y)$)
+- 3D sound speed profiles (`$c(x,y,z)$`)
+- 2D bathymetry (`$b(x,y)$`)
 - Efficient wideband beam tracing using Gaussian beams (ray geometry is traced as frequency independent, then the beam influence is calculated at receiver coordinates for each frequency)
 - Python bindings via pyo3
 - IO with json files
