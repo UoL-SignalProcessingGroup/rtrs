@@ -3,7 +3,7 @@
 Underwater acoustic ray tracing in Rust.
 
 ## Current Features
-- 3D ray / beam tracing ()
+- 3D ray / beam tracing
 - Surface (vacuum) and bottom (rigid, lossy acoustic, lossy elastic) reflections
 - 3D sound speed profiles ($c(x,y,z)$)
 - 2D bathymetry ($b(x,y)$)
