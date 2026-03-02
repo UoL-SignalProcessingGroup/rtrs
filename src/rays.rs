@@ -1,5 +1,5 @@
 use crate::bty;
-use crate::input::config::SimulationConfig;
+use crate::input::config::{IntegrationMethod, SimulationConfig};
 use crate::ssp::{
     init_ssp_cursor,
     interpolate_c_with_cursor,
@@ -42,6 +42,17 @@ pub struct Ray {
     pub bottom_bounce: Option<BottomBounceMetadata>,
 }
 
+struct RayDerivatives {
+    d_position: [f32; 3],
+    d_direction: [f32; 3],
+    d_phi: f32,
+    d_p_tilde: [f32; 2],
+    d_q_tilde: [f32; 2],
+    d_p_hat: [f32; 2],
+    d_q_hat: [f32; 2],
+    c: f32,
+}
+
 
 pub fn trace_ray(
     azim: f32, 
@@ -81,16 +92,30 @@ pub fn trace_ray(
 
     for step in 0..max_n_steps {
 
-        // perform Euler step
-        euler_step_ray(
-            &mut ray_history,
-            config.beam.step_m,
-            step,
-            ssp_field,
-            &mut ssp_cursor,
-            bty_field,
-            &mut bty_cursor,
-        );
+        match config.beam.integration_method {
+            IntegrationMethod::Euler => {
+                euler_step_ray(
+                    &mut ray_history,
+                    config.beam.step_m,
+                    step,
+                    ssp_field,
+                    &mut ssp_cursor,
+                    bty_field,
+                    &mut bty_cursor,
+                );
+            }
+            IntegrationMethod::Rk2 => {
+                midpoint_rk2_step_ray(
+                    &mut ray_history,
+                    config.beam.step_m,
+                    step,
+                    ssp_field,
+                    &mut ssp_cursor,
+                    bty_field,
+                    &mut bty_cursor,
+                );
+            }
+        }
 
         // check for boundary reflections
         reflect_boundaries(&mut ray_history, bty_field, &mut bty_cursor);
@@ -162,31 +187,10 @@ fn euler_step_ray(
     bty_field: &bty::BTYfield,
     bty_cursor: &mut bty::BTYCursor,
 ) {
-    // Euler Method
+    let ray0 = &ray_history[step];
+    let derivatives_at_start = compute_ray_derivatives(ray0, ssp, ssp_cursor);
 
-    // allocate ray states for step
-    let ray0 = &ray_history[step];   // start state
-
-    // find local sound speed and gradients
-    let c0 = interpolate_c_with_cursor(ray0.position, ssp, ssp_cursor);
-    let grad_c0 = interpolate_grad_c_with_cursor(ray0.position, ssp, ssp_cursor);
-    let partial_c0 = interpolate_partials_c_with_cursor(ray0.position, ssp, ssp_cursor);
-
-    // find ray normals
-    let (e1, e2) = ray_normal(ray0.direction, ray0.phi, c0);
-
-    // calculate ray-centered partials of c
-    let [cnn, cmn, cmm] = calculate_ray_partials_c(
-        partial_c0[0], partial_c0[3], partial_c0[4],
-        partial_c0[1], partial_c0[5], partial_c0[2],
-        e1, e2);
-    
-    // unit direction scaled by local c
-    let unit_direction = [
-        c0 * ray0.direction[0],
-        c0 * ray0.direction[1],
-        c0 * ray0.direction[2],
-    ];
+    let unit_direction = derivatives_at_start.d_position;
 
     let h = reduce_step_to_boundaries(
         ray0.position,
@@ -205,59 +209,40 @@ fn euler_step_ray(
         ray0.position[2] + h * unit_direction[2],
     ];
 
-    // direction half update
+    // direction update
     let direction = [
-        ray0.direction[0] - h * grad_c0[0] / c0.powi(2),
-        ray0.direction[1] - h * grad_c0[1] / c0.powi(2),
-        ray0.direction[2] - h * grad_c0[2] / c0.powi(2),
+        ray0.direction[0] + h * derivatives_at_start.d_direction[0],
+        ray0.direction[1] + h * derivatives_at_start.d_direction[1],
+        ray0.direction[2] + h * derivatives_at_start.d_direction[2],
     ];
 
-    // phi half update
-    let denom = ray0.direction[0].powi(2) + ray0.direction[1].powi(2);
-    let phi = if denom > 1.0e-12 {
-        ray0.phi + h * c0.recip() * ray0.direction[2]
-            * (ray0.direction[1] * grad_c0[0] - ray0.direction[0] * grad_c0[1])
-            / denom
-    } else {
-        ray0.phi
-    };
+    let phi = ray0.phi + h * derivatives_at_start.d_phi;
 
-    // Construct the 2x2 matrix of ray-centered sound speed second derivatives (c_mat0)
-    // and apply it directly to update paraxial vectors without allocating ndarray arrays.
-    let c0_pow2 = c0 * c0;
-    let c11 = -cnn / c0_pow2; // c_mat0[0][0]
-    let c12 = -cmn / c0_pow2; // c_mat0[0][1] and [1][0]
-    let c22 = -cmm / c0_pow2; // c_mat0[1][1]
-
-    // p_tilde = p_tilde + ds * c_mat0 * q_tilde
     let p_tilde = [
-        ray0.p_tilde[0] + h * (c11 * ray0.q_tilde[0] + c12 * ray0.q_tilde[1]),
-        ray0.p_tilde[1] + h * (c12 * ray0.q_tilde[0] + c22 * ray0.q_tilde[1]),
+        ray0.p_tilde[0] + h * derivatives_at_start.d_p_tilde[0],
+        ray0.p_tilde[1] + h * derivatives_at_start.d_p_tilde[1],
     ];
 
-    // q_tilde = q_tilde + ds * c0 * p_tilde
     let q_tilde = [
-        ray0.q_tilde[0] + h * c0 * ray0.p_tilde[0],
-        ray0.q_tilde[1] + h * c0 * ray0.p_tilde[1],
+        ray0.q_tilde[0] + h * derivatives_at_start.d_q_tilde[0],
+        ray0.q_tilde[1] + h * derivatives_at_start.d_q_tilde[1],
     ];
 
-    // p_hat = p_hat + ds * c_mat0 * q_hat
     let p_hat = [
-        ray0.p_hat[0] + h * (c11 * ray0.q_hat[0] + c12 * ray0.q_hat[1]),
-        ray0.p_hat[1] + h * (c12 * ray0.q_hat[0] + c22 * ray0.q_hat[1]),
+        ray0.p_hat[0] + h * derivatives_at_start.d_p_hat[0],
+        ray0.p_hat[1] + h * derivatives_at_start.d_p_hat[1],
     ];
 
-    // q_hat = q_hat + ds * c0 * p_hat
     let q_hat = [
-        ray0.q_hat[0] + h * c0 * ray0.p_hat[0],
-        ray0.q_hat[1] + h * c0 * ray0.p_hat[1],
+        ray0.q_hat[0] + h * derivatives_at_start.d_q_hat[0],
+        ray0.q_hat[1] + h * derivatives_at_start.d_q_hat[1],
     ];
 
     let ray1 = Ray {
         position,
         direction,
         phi,
-        travel_time: ray0.travel_time + h / c0,
+        travel_time: ray0.travel_time + h / derivatives_at_start.c,
         amplitude: ray0.amplitude,
         phase: ray0.phase,
         num_top_bounces: ray0.num_top_bounces,
@@ -267,7 +252,7 @@ fn euler_step_ray(
         p_hat,
         q_hat,
         det_q: ray0.det_q,
-        c: c0,
+        c: derivatives_at_start.c,
         bottom_bounce: None,
     };
 
@@ -278,6 +263,187 @@ fn euler_step_ray(
     update_ssp_cursor(last_pos, ssp, ssp_cursor);
     bty::update_bty_cursor(last_pos, bty_field, bty_cursor);
 
+}
+
+fn midpoint_rk2_step_ray(
+    ray_history: &mut Vec<Ray>,
+    ds: f32,
+    step: usize,
+    ssp: &SSPFields,
+    ssp_cursor: &mut SSPCursor,
+    bty_field: &bty::BTYfield,
+    bty_cursor: &mut bty::BTYCursor,
+) {
+    let ray0 = &ray_history[step];
+    let derivatives_at_start = compute_ray_derivatives(ray0, ssp, ssp_cursor);
+
+    let h = reduce_step_to_boundaries(
+        ray0.position,
+        derivatives_at_start.d_position,
+        ds,
+        ssp,
+        ssp_cursor,
+        bty_field,
+        bty_cursor,
+    );
+
+    let half_h = 0.5 * h;
+    let midpoint_ray = Ray {
+        position: [
+            ray0.position[0] + half_h * derivatives_at_start.d_position[0],
+            ray0.position[1] + half_h * derivatives_at_start.d_position[1],
+            ray0.position[2] + half_h * derivatives_at_start.d_position[2],
+        ],
+        direction: [
+            ray0.direction[0] + half_h * derivatives_at_start.d_direction[0],
+            ray0.direction[1] + half_h * derivatives_at_start.d_direction[1],
+            ray0.direction[2] + half_h * derivatives_at_start.d_direction[2],
+        ],
+        phi: ray0.phi + half_h * derivatives_at_start.d_phi,
+        travel_time: ray0.travel_time + half_h / derivatives_at_start.c,
+        amplitude: ray0.amplitude,
+        phase: ray0.phase,
+        num_top_bounces: ray0.num_top_bounces,
+        num_bottom_bounces: ray0.num_bottom_bounces,
+        p_tilde: [
+            ray0.p_tilde[0] + half_h * derivatives_at_start.d_p_tilde[0],
+            ray0.p_tilde[1] + half_h * derivatives_at_start.d_p_tilde[1],
+        ],
+        q_tilde: [
+            ray0.q_tilde[0] + half_h * derivatives_at_start.d_q_tilde[0],
+            ray0.q_tilde[1] + half_h * derivatives_at_start.d_q_tilde[1],
+        ],
+        p_hat: [
+            ray0.p_hat[0] + half_h * derivatives_at_start.d_p_hat[0],
+            ray0.p_hat[1] + half_h * derivatives_at_start.d_p_hat[1],
+        ],
+        q_hat: [
+            ray0.q_hat[0] + half_h * derivatives_at_start.d_q_hat[0],
+            ray0.q_hat[1] + half_h * derivatives_at_start.d_q_hat[1],
+        ],
+        det_q: ray0.det_q,
+        c: derivatives_at_start.c,
+        bottom_bounce: None,
+    };
+
+    let mut midpoint_cursor = *ssp_cursor;
+    update_ssp_cursor(midpoint_ray.position, ssp, &mut midpoint_cursor);
+    let derivatives_at_midpoint = compute_ray_derivatives(&midpoint_ray, ssp, &mut midpoint_cursor);
+
+    let ray1 = Ray {
+        position: [
+            ray0.position[0] + h * derivatives_at_midpoint.d_position[0],
+            ray0.position[1] + h * derivatives_at_midpoint.d_position[1],
+            ray0.position[2] + h * derivatives_at_midpoint.d_position[2],
+        ],
+        direction: [
+            ray0.direction[0] + h * derivatives_at_midpoint.d_direction[0],
+            ray0.direction[1] + h * derivatives_at_midpoint.d_direction[1],
+            ray0.direction[2] + h * derivatives_at_midpoint.d_direction[2],
+        ],
+        phi: ray0.phi + h * derivatives_at_midpoint.d_phi,
+        travel_time: ray0.travel_time + h / derivatives_at_midpoint.c,
+        amplitude: ray0.amplitude,
+        phase: ray0.phase,
+        num_top_bounces: ray0.num_top_bounces,
+        num_bottom_bounces: ray0.num_bottom_bounces,
+        p_tilde: [
+            ray0.p_tilde[0] + h * derivatives_at_midpoint.d_p_tilde[0],
+            ray0.p_tilde[1] + h * derivatives_at_midpoint.d_p_tilde[1],
+        ],
+        q_tilde: [
+            ray0.q_tilde[0] + h * derivatives_at_midpoint.d_q_tilde[0],
+            ray0.q_tilde[1] + h * derivatives_at_midpoint.d_q_tilde[1],
+        ],
+        p_hat: [
+            ray0.p_hat[0] + h * derivatives_at_midpoint.d_p_hat[0],
+            ray0.p_hat[1] + h * derivatives_at_midpoint.d_p_hat[1],
+        ],
+        q_hat: [
+            ray0.q_hat[0] + h * derivatives_at_midpoint.d_q_hat[0],
+            ray0.q_hat[1] + h * derivatives_at_midpoint.d_q_hat[1],
+        ],
+        det_q: ray0.det_q,
+        c: derivatives_at_midpoint.c,
+        bottom_bounce: None,
+    };
+
+    ray_history.push(ray1);
+
+    let last_pos = ray_history.last().unwrap().position;
+    update_ssp_cursor(last_pos, ssp, ssp_cursor);
+    bty::update_bty_cursor(last_pos, bty_field, bty_cursor);
+}
+
+fn compute_ray_derivatives(
+    ray: &Ray,
+    ssp: &SSPFields,
+    ssp_cursor: &mut SSPCursor,
+) -> RayDerivatives {
+    let c = interpolate_c_with_cursor(ray.position, ssp, ssp_cursor);
+    let grad_c = interpolate_grad_c_with_cursor(ray.position, ssp, ssp_cursor);
+    let partial_c = interpolate_partials_c_with_cursor(ray.position, ssp, ssp_cursor);
+
+    let (e1, e2) = ray_normal(ray.direction, ray.phi, c);
+    let [cnn, cmn, cmm] = calculate_ray_partials_c(
+        partial_c[0], partial_c[3], partial_c[4],
+        partial_c[1], partial_c[5], partial_c[2],
+        e1, e2,
+    );
+
+    let d_position = [
+        c * ray.direction[0],
+        c * ray.direction[1],
+        c * ray.direction[2],
+    ];
+
+    let c_pow2 = c * c;
+    let d_direction = [
+        -grad_c[0] / c_pow2,
+        -grad_c[1] / c_pow2,
+        -grad_c[2] / c_pow2,
+    ];
+
+    let denom = ray.direction[0].powi(2) + ray.direction[1].powi(2);
+    let d_phi = if denom > 1.0e-12 {
+        c.recip() * ray.direction[2]
+            * (ray.direction[1] * grad_c[0] - ray.direction[0] * grad_c[1])
+            / denom
+    } else {
+        0.0
+    };
+
+    let c11 = -cnn / c_pow2;
+    let c12 = -cmn / c_pow2;
+    let c22 = -cmm / c_pow2;
+
+    let d_p_tilde = [
+        c11 * ray.q_tilde[0] + c12 * ray.q_tilde[1],
+        c12 * ray.q_tilde[0] + c22 * ray.q_tilde[1],
+    ];
+    let d_q_tilde = [
+        c * ray.p_tilde[0],
+        c * ray.p_tilde[1],
+    ];
+    let d_p_hat = [
+        c11 * ray.q_hat[0] + c12 * ray.q_hat[1],
+        c12 * ray.q_hat[0] + c22 * ray.q_hat[1],
+    ];
+    let d_q_hat = [
+        c * ray.p_hat[0],
+        c * ray.p_hat[1],
+    ];
+
+    RayDerivatives {
+        d_position,
+        d_direction,
+        d_phi,
+        d_p_tilde,
+        d_q_tilde,
+        d_p_hat,
+        d_q_hat,
+        c,
+    }
 }
 
 

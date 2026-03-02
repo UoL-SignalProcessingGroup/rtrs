@@ -16,9 +16,19 @@ use output::write_json;
 
 fn load_config(path: &str) -> Result<SimulationConfig> {
     let text = fs::read_to_string(path)?;
-    let mut cfg: SimulationConfig = serde_json::from_str(&text)?;
-    let warnings = cfg.validate()?;
-    for w in &warnings {
+    let mut unknown_fields = Vec::new();
+    let mut de = serde_json::Deserializer::from_str(&text);
+    let mut cfg: SimulationConfig = serde_ignored::deserialize(&mut de, |path| {
+        unknown_fields.push(path.to_string());
+    })?;
+    let mut warnings = cfg.validate()?;
+    warnings.extend(
+        unknown_fields
+            .into_iter()
+            .map(|field| format!("unknown input key is ignored: config.{}", field)),
+    );
+
+    for w in warnings {
         eprintln!("WARNING {}", w);
     }
     Ok(cfg)

@@ -40,6 +40,8 @@ env_m = {
         "max_steps": 100_000,
         "max_range_m": 55_000.0,
         "store_ray_paths": True,
+        "integration_method": "rk2",
+        "$$$": "dollar"
     }
 }
 

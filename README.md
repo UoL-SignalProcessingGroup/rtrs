@@ -13,6 +13,8 @@ Underwater acoustic ray tracing in Rust.
 - Receiver representation for grids and arrays
 - Parallel processing over the number of rays / beams with rayon
 - Optional no-ray-path mode to reduce memory and output size
+- Euler and RK2 integration methods
+- Input validation
 
 ## Planned Features
 - Low frequency correction

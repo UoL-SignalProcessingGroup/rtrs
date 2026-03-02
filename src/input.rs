@@ -4,6 +4,7 @@ pub mod config {
 
     fn default_none_f32() -> Option<f32> { None }
     fn default_true() -> bool { true }
+    fn default_integration_method() -> IntegrationMethod { IntegrationMethod::Euler }
 
     #[derive(Debug, Deserialize)]
     pub struct SoundSpeed {
@@ -181,12 +182,21 @@ pub mod config {
     }
 
     #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum IntegrationMethod {
+        Euler,
+        Rk2,
+    }
+
+    #[derive(Debug, Deserialize)]
     pub struct BeamSettings {
         pub step_m: f32,
         pub max_steps: usize,
         pub max_range_m: f32,
         #[serde(default = "default_true")]
         pub store_ray_paths: bool,
+        #[serde(default = "default_integration_method")]
+        pub integration_method: IntegrationMethod,
     }
 
     impl BeamSettings {

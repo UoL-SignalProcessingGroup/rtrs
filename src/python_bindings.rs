@@ -23,11 +23,21 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
         .extract()
         .map_err(|e| PyRuntimeError::new_err(format!("extract json string failed: {}", e)))?;
 
-    let mut cfg: SimulationConfig = serde_json::from_str(&json_str)
+    let mut unknown_fields = Vec::new();
+    let mut de = serde_json::Deserializer::from_str(&json_str);
+    let mut cfg: SimulationConfig = serde_ignored::deserialize(&mut de, |path| {
+        unknown_fields.push(path.to_string());
+    })
         .map_err(|e| PyRuntimeError::new_err(format!("failed to parse config JSON: {}", e)))?;
 
-    let warnings = cfg.validate()
+    let mut warnings = cfg.validate()
         .map_err(|e| PyRuntimeError::new_err(format!("invalid simulation config: {}", e)))?;
+
+    warnings.extend(
+        unknown_fields
+            .into_iter()
+            .map(|field| format!("unknown input key is ignored: config.{}", field)),
+    );
 
     // Surface validation warnings as Python warnings so they are visible regardless of environment
     if !warnings.is_empty() {
