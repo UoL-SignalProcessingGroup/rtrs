@@ -69,7 +69,8 @@ tl = - 20 * np.log10(np.abs(pressure))
 
 
 python_utils.plot_rays_xz(rays)
-python_utils.plot_rays_yz(rays)
+# python_utils.plot_rays_yz(rays)
+python_utils.plot_rays_yz_bty(rays, x_bty, y_bty, z_bty)
 python_utils.plot_rays_xy(rays)
 # python_utils.plot_rays_3d(rays)
 python_utils.plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)

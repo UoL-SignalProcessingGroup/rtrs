@@ -121,6 +121,29 @@ def plot_rays_yz(rays):
     plt.grid()
     plt.tight_layout()
 
+def plot_rays_yz_bty(rays, x_bty, y_bty, z_bty, x_idx=None):
+    plt.figure()
+    for ray in rays:
+        y = ray[:,1]
+        z = ray[:,2]
+        plt.plot(y, z, lw=0.8)
+
+    if x_idx is None:
+        z_profile = np.min(z_bty, axis=1)
+        bty_label = 'bathymetry (projected min depth over x)'
+    else:
+        z_profile = z_bty[:, x_idx]
+        bty_label = f'bathymetry at x={x_bty[x_idx]:.1f} m'
+
+    plt.plot(y_bty, z_profile, 'k-', lw=1.8, label=bty_label)
+    plt.xlabel('y (m)')
+    plt.ylabel('depth (m)')
+    plt.title('Ray paths (y-z plane) with Bathymetry')
+    plt.gca().invert_yaxis()
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+
 def plot_rays_xz(rays):
     plt.figure()
     for ray in rays:
