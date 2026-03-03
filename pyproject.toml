@@ -9,12 +9,15 @@ description = "Ray tracing acoustic propagation model"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { file = "LICENSE" }
-dependencies = [
-    "numpy>=1.20",
-    "matplotlib>=3.5",
-]
 
 [project.optional-dependencies]
+viz = [
+    "numpy>=1.20",
+    "matplotlib>=3.5",
+    "cmocean>=4.0",
+    "plotly>=5.0",
+    "dash>=2.0",
+]
 dev = [
     "maturin>=1.0",
 ]

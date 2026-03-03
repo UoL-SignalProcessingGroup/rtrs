@@ -17,7 +17,6 @@ if os.path.exists(outfile):
 
 env_p = {
     "ssp": {
-        
         "x_ssp_m": [0.0, 30000.0],
         "y_ssp_m": [0.0, 30000.0],
         "z_ssp_m": [0.0, 100.0],

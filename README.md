@@ -49,6 +49,21 @@ conda activate <env_name>
 pip install -e .
 ```
 
+### Python Bindings with plotting for examples
+
+For running the examples with plotting, install the `viz` extra dependencies:
+```bash
+python -m venv --prompt rtrs .venv
+source .venv/bin/activate
+pip install -e ".[viz]"
+```
+
+or with conda:
+```bash
+conda activate <env_name>
+pip install -e ".[viz]"
+```
+
 ### Python Bindings with Development Mode
 
 Useful for testing changes to the Rust code without needing to reinstall the package after every change. The `dev` extra also includes `maturin` as a dependency for building the Rust extension.
@@ -64,6 +79,11 @@ or with conda:
 ```bash
 conda activate <env_name>
 pip install -e ".[dev]"
+```
+
+For plotting and development, install both extras:
+```bash
+pip install -e ".[dev,viz]"
 ```
 
 Build the Rust extension into the active environment:

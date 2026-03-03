@@ -33,7 +33,6 @@ env_m = {
                               [5000.0, 5000.0]]).flatten(order='C').tolist(),
         "water_density_g_cm3": 1.0,
         "bottom_model": {
-            # "model": "rigid",
             "model": "elastic",
             "compressional_speed_m_s": 1700.0,
             "shear_speed_m_s": 400.0,
@@ -43,26 +42,26 @@ env_m = {
         }
     },
     "source": {
-        "position": [0.0, 0.0, 1000.0],
+        "position": [0.0, 0.0, 10.0],
         "freq_hz": [200.0],
         # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
-        "launch_elev_deg": np.linspace(-50.0, 50.0, 500).tolist(),
-        "launch_azim_deg": np.linspace(-0.5, 0.5, 3).tolist()
+        "launch_elev_deg": np.linspace(-75.0, 75.0, 725).tolist(),
+        "launch_azim_deg": np.linspace(-45.0, 45.0, 60).tolist()
     },
     "receivers": {
         "config_type": "grid",
-        "x_rcvr_m": [0.0],
-        # "x_rcvr_m": np.full(250,0.0).tolist(),
+        # "x_rcvr_m": [0.0],
+        "x_rcvr_m": np.linspace(-25000.0, 25000.0, 450).tolist(),
         "y_rcvr_m": np.linspace(0.0, 50000.0, 450).tolist(),
-        "z_rcvr_m": np.linspace(0.0, 5000.0, 450).tolist()
+        # "z_rcvr_m": np.linspace(0.0, 5000.0, 450).tolist(),
+        "z_rcvr_m": [100.0]
     },
     "beam": {
-        "step_m": 10.0,
+        "step_m": 25.0,
         "max_steps": 100_000,
         "max_range_m": 50_000.0,
         "store_ray_paths": False,
         "integration_method": "rk2",
-        "hello": "go_away"
     }
 }
 
@@ -85,11 +84,12 @@ tl = -20 * np.log10(np.maximum(np.abs(pressure), 1e-30))
 # python_utils.plot_rays_xz(rays)
 # python_utils.plot_rays_yz(rays)
 
-z_val = 1000.0
+z_val = 10.0
 z_idx = (np.abs(z_m - z_val)).argmin()
 python_utils.plot_line_tl_y(tl[0, :, :, :], x_m, y_m, z_m,
                             x_idx=len(x_m) // 2, z_idx=z_idx)
 python_utils.plot_tl_yz(tl[0, :, :, :], x_m, y_m, z_m, x_idx=len(x_m) // 2)
+python_utils.plot_tl_xy(tl[0, :, :, :], x_m, y_m, z_m, z_idx=z_idx)
 python_utils.plot_pressure_yz(np.real(pressure[0, :, :, :]), x_m, y_m, z_m,
                                x_idx=len(x_m) // 2)
 
