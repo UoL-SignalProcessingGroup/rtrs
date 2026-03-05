@@ -180,10 +180,13 @@ pub fn compute_bottom_reflection_coefficient(
     boundary_normal: [f32; 3],
     angular_frequency_rad_s: f32,
 ) -> Complex32 {
-    // No frequency means no dispersive/lossy boundary correction.
-    if angular_frequency_rad_s <= 0.0 {
+    // Zero frequency means no dispersive/lossy boundary correction.
+    if angular_frequency_rad_s == 0.0 {
         return Complex32::new(1.0, 0.0);
     }
+
+    let use_conjugate_branch = angular_frequency_rad_s < 0.0;
+    let omega_abs = angular_frequency_rad_s.abs();
 
     // Rigid boundary: unity reflection with zero phase shift.
     if matches!(bottom_model, BottomBoundaryRuntimeModel::Rigid) {
@@ -235,8 +238,8 @@ pub fn compute_bottom_reflection_coefficient(
         + tangential_slowness[2] * tangential_slowness[2])
         .sqrt();
 
-    let horizontal_wavenumber = angular_frequency_rad_s * tangential_slowness_magnitude;
-    let vertical_wavenumber_water = angular_frequency_rad_s * normal_slowness;
+    let horizontal_wavenumber = omega_abs * tangential_slowness_magnitude;
+    let vertical_wavenumber_water = omega_abs * normal_slowness;
     let imaginary_unit = Complex32::new(0.0, 1.0);
 
     let reflection_coefficient = match bottom_model {
@@ -251,16 +254,16 @@ pub fn compute_bottom_reflection_coefficient(
                 attenuation_db_per_wavelength_to_np_per_m(
                     *compressional_attenuation_db_per_wavelength,
                     *compressional_speed_m_s,
-                    angular_frequency_rad_s,
+                    omega_abs,
                 );
             let bottom_compressional_speed = complex_wave_speed_from_attenuation(
                 *compressional_speed_m_s,
                 compressional_attenuation_np_per_m,
-                angular_frequency_rad_s,
+                omega_abs,
             );
             let vertical_wavenumber_bottom_p = stable_complex_sqrt(
                 Complex32::new(horizontal_wavenumber * horizontal_wavenumber, 0.0)
-                    - complex_omega_over_speed_sq(angular_frequency_rad_s, bottom_compressional_speed),
+                    - complex_omega_over_speed_sq(omega_abs, bottom_compressional_speed),
             );
 
             // Bellhop fluid-halfspace form using f (vertical wavenumber) and g (density).
@@ -290,30 +293,30 @@ pub fn compute_bottom_reflection_coefficient(
                 attenuation_db_per_wavelength_to_np_per_m(
                     *compressional_attenuation_db_per_wavelength,
                     *compressional_speed_m_s,
-                    angular_frequency_rad_s,
+                    omega_abs,
                 );
             let shear_attenuation_np_per_m = attenuation_db_per_wavelength_to_np_per_m(
                 *shear_attenuation_db_per_wavelength,
                 *shear_speed_m_s,
-                angular_frequency_rad_s,
+                omega_abs,
             );
 
             let bottom_compressional_speed = complex_wave_speed_from_attenuation(
                 *compressional_speed_m_s,
                 compressional_attenuation_np_per_m,
-                angular_frequency_rad_s,
+                omega_abs,
             );
             let bottom_shear_speed = complex_wave_speed_from_attenuation(
                 *shear_speed_m_s,
                 shear_attenuation_np_per_m,
-                angular_frequency_rad_s,
+                omega_abs,
             );
 
             let horizontal_wavenumber_sq = Complex32::new(horizontal_wavenumber * horizontal_wavenumber, 0.0);
             let vertical_wavenumber_bottom_s_sq =
-                horizontal_wavenumber_sq - complex_omega_over_speed_sq(angular_frequency_rad_s, bottom_shear_speed);
+                horizontal_wavenumber_sq - complex_omega_over_speed_sq(omega_abs, bottom_shear_speed);
             let vertical_wavenumber_bottom_p_sq =
-                horizontal_wavenumber_sq - complex_omega_over_speed_sq(angular_frequency_rad_s, bottom_compressional_speed);
+                horizontal_wavenumber_sq - complex_omega_over_speed_sq(omega_abs, bottom_compressional_speed);
 
             let vertical_wavenumber_bottom_s = stable_complex_sqrt(vertical_wavenumber_bottom_s_sq);
             let vertical_wavenumber_bottom_p = stable_complex_sqrt(vertical_wavenumber_bottom_p_sq);
@@ -331,7 +334,7 @@ pub fn compute_bottom_reflection_coefficient(
             let y4 = vertical_wavenumber_bottom_p
                 * (horizontal_wavenumber_sq - vertical_wavenumber_bottom_s_sq);
 
-            let f_term = Complex32::new(angular_frequency_rad_s * angular_frequency_rad_s, 0.0) * y4;
+            let f_term = Complex32::new(omega_abs * omega_abs, 0.0) * y4;
             let g_term = y2;
 
             let numerator = Complex32::new(water_density_g_cm3, 0.0) * f_term
@@ -345,6 +348,12 @@ pub fn compute_bottom_reflection_coefficient(
                 -numerator / denominator
             }
         }
+    };
+
+    let reflection_coefficient = if use_conjugate_branch {
+        reflection_coefficient.conj()
+    } else {
+        reflection_coefficient
     };
 
     if reflection_coefficient.norm() < 1e-12 {
@@ -396,5 +405,63 @@ fn stable_complex_sqrt(value: Complex32) -> Complex32 {
         root = -root;
     }
     root
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn negative_frequency_is_conjugate_of_positive_for_acoustic_bottom() {
+        let model = BottomBoundaryRuntimeModel::Acoustic {
+            compressional_speed_m_s: 1700.0,
+            density_g_cm3: 1.8,
+            compressional_attenuation_db_per_wavelength: 0.5,
+        };
+
+        let incident_slowness = [0.0, 0.0, 1.0 / 1500.0];
+        let boundary_normal = [0.0, 0.0, 1.0];
+        let omega = 2.0 * PI * 1000.0;
+
+        let r_pos = compute_bottom_reflection_coefficient(
+            &model,
+            1.0,
+            1500.0,
+            incident_slowness,
+            boundary_normal,
+            omega,
+        );
+
+        let r_neg = compute_bottom_reflection_coefficient(
+            &model,
+            1.0,
+            1500.0,
+            incident_slowness,
+            boundary_normal,
+            -omega,
+        );
+
+        assert!((r_neg - r_pos.conj()).norm() < 1.0e-4);
+    }
+
+    #[test]
+    fn zero_frequency_returns_unity() {
+        let model = BottomBoundaryRuntimeModel::Acoustic {
+            compressional_speed_m_s: 1700.0,
+            density_g_cm3: 1.8,
+            compressional_attenuation_db_per_wavelength: 0.5,
+        };
+
+        let reflection = compute_bottom_reflection_coefficient(
+            &model,
+            1.0,
+            1500.0,
+            [0.0, 0.0, 1.0 / 1500.0],
+            [0.0, 0.0, 1.0],
+            0.0,
+        );
+
+        assert_eq!(reflection, Complex32::new(1.0, 0.0));
+    }
 }
 

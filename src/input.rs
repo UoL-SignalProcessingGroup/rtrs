@@ -147,9 +147,9 @@ pub mod config {
                 ));
                 self.position[2] = self.position[2].abs();
             }
-            if self.freq_hz.iter().any(|&f| f < 0.0 ) {
-                errors.push("source: frequencies in freq_hz must be non-negative".into());
-            }
+            // if self.freq_hz.iter().any(|&f| f < 0.0 ) {
+            //     errors.push("source: frequencies in freq_hz must be non-negative".into());
+            // }
             if self.launch_elev_deg.iter().any(|&a| a < -90.0 || a > 90.0) {
                 errors.push("source: launch elevation angles must be in [-90, 90] deg".into());
             }
