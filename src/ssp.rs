@@ -85,11 +85,7 @@ pub fn reduce_step_to_ssp_interfaces(
             return;
         }
 
-        let boundary = if vel > 0.0 {
-            arr[idx + 1]
-        } else {
-            arr[idx]
-        };
+        let boundary = if vel > 0.0 { arr[idx + 1] } else { arr[idx] };
 
         let h_cross = (boundary - pos) / vel;
         if h_cross > eps && h_cross < *h_cur {
@@ -105,7 +101,6 @@ pub fn reduce_step_to_ssp_interfaces(
 }
 
 pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
-
     let (nx, ny, nz) = (
         config.ssp.x_ssp_m.len(),
         config.ssp.y_ssp_m.len(),
@@ -114,26 +109,14 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
     let c = Array3::from_shape_vec((nx, ny, nz), config.ssp.c_m_s.clone())
         .expect("c_m_s does not match grid dimensions");
     // println!("c: {}", c);
-    
+
     let x = &config.ssp.x_ssp_m;
     let y = &config.ssp.y_ssp_m;
     let z = &config.ssp.z_ssp_m;
 
-    let dx = if x.len() >= 2 {
-        x[1] - x[0]
-    } else {
-        1.0
-    };
-    let dy = if y.len() >= 2 {
-        y[1] - y[0]
-    } else {
-        1.0
-    };
-    let dz = if z.len() >= 2 {
-        z[1] - z[0]
-    } else {
-        1.0
-    };
+    let dx = if x.len() >= 2 { x[1] - x[0] } else { 1.0 };
+    let dy = if y.len() >= 2 { y[1] - y[0] } else { 1.0 };
+    let dz = if z.len() >= 2 { z[1] - z[0] } else { 1.0 };
 
     let cx = partial_x(&c, dx);
     let cy = partial_y(&c, dy);
@@ -144,10 +127,9 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
     let cxy = partial_y(&cx, dy);
     let cxz = partial_z(&cx, dz);
     let cyz = partial_z(&cy, dz);
-    
 
     let ssp_field = SSPFields {
-        c: c.clone(),
+        c,
         x: x.clone(),
         y: y.clone(),
         z: z.clone(),
@@ -165,58 +147,85 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
     return ssp_field;
 }
 
-
-pub fn interpolate_c_with_cursor(position: [f32; 3], ssp: &SSPFields, cursor: &mut SSPCursor) -> f32 {
+pub fn interpolate_c_with_cursor(
+    position: [f32; 3],
+    ssp: &SSPFields,
+    cursor: &mut SSPCursor,
+) -> f32 {
     trilinear_interpolation_with_cursor(position, &ssp.c, &ssp.x, &ssp.y, &ssp.z, cursor)
 }
 
-pub fn interpolate_grad_c_with_cursor(
+pub fn interpolate_all_with_cursor(
     position: [f32; 3],
     ssp: &SSPFields,
     cursor: &mut SSPCursor,
-) -> [f32; 3] {
-    let cx = trilinear_interpolation_with_cursor(position, &ssp.cx, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let cy = trilinear_interpolation_with_cursor(position, &ssp.cy, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let cz = trilinear_interpolation_with_cursor(position, &ssp.cz, &ssp.x, &ssp.y, &ssp.z, cursor);
-    [cx, cy, cz]
-}
+) -> (f32, [f32; 3], [f32; 6]) {
+    let (i, j, k, wx, wy, wz) = update_cursor_and_weights(position, &ssp.x, &ssp.y, &ssp.z, cursor);
 
-pub fn interpolate_partials_c_with_cursor(
-    position: [f32; 3],
-    ssp: &SSPFields,
-    cursor: &mut SSPCursor,
-) -> [f32; 6] {
-    let cxx = trilinear_interpolation_with_cursor(position, &ssp.cxx, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let cyy = trilinear_interpolation_with_cursor(position, &ssp.cyy, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let czz = trilinear_interpolation_with_cursor(position, &ssp.czz, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let cxy = trilinear_interpolation_with_cursor(position, &ssp.cxy, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let cxz = trilinear_interpolation_with_cursor(position, &ssp.cxz, &ssp.x, &ssp.y, &ssp.z, cursor);
-    let cyz = trilinear_interpolation_with_cursor(position, &ssp.cyz, &ssp.x, &ssp.y, &ssp.z, cursor);
-    [cxx, cyy, czz, cxy, cxz, cyz]
+    let mut c = 0.0_f32;
+    let mut grad = [0.0_f32; 3];
+    let mut partials = [0.0_f32; 6];
+
+    for dx in 0..=1 {
+        for dy in 0..=1 {
+            for dz in 0..=1 {
+                let weight = wx[dx] * wy[dy] * wz[dz];
+                let ix = i + dx;
+                let iy = j + dy;
+                let iz = k + dz;
+
+                c += ssp.c[[ix, iy, iz]] * weight;
+                grad[0] += ssp.cx[[ix, iy, iz]] * weight;
+                grad[1] += ssp.cy[[ix, iy, iz]] * weight;
+                grad[2] += ssp.cz[[ix, iy, iz]] * weight;
+
+                partials[0] += ssp.cxx[[ix, iy, iz]] * weight;
+                partials[1] += ssp.cyy[[ix, iy, iz]] * weight;
+                partials[2] += ssp.czz[[ix, iy, iz]] * weight;
+                partials[3] += ssp.cxy[[ix, iy, iz]] * weight;
+                partials[4] += ssp.cxz[[ix, iy, iz]] * weight;
+                partials[5] += ssp.cyz[[ix, iy, iz]] * weight;
+            }
+        }
+    }
+
+    (c, grad, partials)
 }
 
 pub fn calculate_ray_partials_c(
-    cxx: f32, cxy: f32, cxz: f32, cyy: f32, cyz: f32, czz: f32, e1: [f32; 3], e2: [f32; 3]) -> [f32; 3] {
+    cxx: f32,
+    cxy: f32,
+    cxz: f32,
+    cyy: f32,
+    cyz: f32,
+    czz: f32,
+    e1: [f32; 3],
+    e2: [f32; 3],
+) -> [f32; 3] {
     // calculate cnn cmn cmm curvature of sound speed (ray-centered)
-    let cnn = cxx * e1[0].powi(2) + cyy * e1[1].powi(2) + czz * e1[2].powi(2)
+    let cnn = cxx * e1[0].powi(2)
+        + cyy * e1[1].powi(2)
+        + czz * e1[2].powi(2)
         + 2.0 * cxy * e1[0] * e1[1]
         + 2.0 * cxz * e1[0] * e1[2]
         + 2.0 * cyz * e1[1] * e1[2];
 
-    let cmn = cxx * e1[0] * e2[0] + cyy * e1[1] * e2[1] + czz * e1[2] * e2[2]
+    let cmn = cxx * e1[0] * e2[0]
+        + cyy * e1[1] * e2[1]
+        + czz * e1[2] * e2[2]
         + cxy * (e1[0] * e2[1] + e2[0] * e1[1])
         + cxz * (e1[0] * e2[2] + e2[0] * e1[2])
         + cyz * (e1[1] * e2[2] + e2[1] * e1[2]);
 
-    let cmm = cxx * e2[0].powi(2) + cyy * e2[1].powi(2) + czz * e2[2].powi(2)
+    let cmm = cxx * e2[0].powi(2)
+        + cyy * e2[1].powi(2)
+        + czz * e2[2].powi(2)
         + 2.0 * cxy * e2[0] * e2[1]
         + 2.0 * cxz * e2[0] * e2[2]
         + 2.0 * cyz * e2[1] * e2[2];
 
     [cnn, cmn, cmm]
-
 }
-
 
 fn partial_x(c: &Array3<f32>, dx: f32) -> Array3<f32> {
     let (nx, ny, nz) = c.dim();
@@ -311,7 +320,6 @@ fn partial_z(c: &Array3<f32>, dz: f32) -> Array3<f32> {
     d
 }
 
-
 // trilinear interpolation with cursor
 fn trilinear_interpolation_with_cursor(
     position: [f32; 3],
@@ -321,6 +329,28 @@ fn trilinear_interpolation_with_cursor(
     z: &[f32],
     cursor: &mut SSPCursor,
 ) -> f32 {
+    let (i, j, k, wx, wy, wz) = update_cursor_and_weights(position, x, y, z, cursor);
+
+    let mut c = 0.0;
+    for dx in 0..=1 {
+        for dy in 0..=1 {
+            for dz in 0..=1 {
+                let weight = wx[dx] * wy[dy] * wz[dz];
+                c += field[[i + dx, j + dy, k + dz]] * weight;
+            }
+        }
+    }
+
+    c
+}
+
+fn update_cursor_and_weights(
+    position: [f32; 3],
+    x: &[f32],
+    y: &[f32],
+    z: &[f32],
+    cursor: &mut SSPCursor,
+) -> (usize, usize, usize, [f32; 2], [f32; 2], [f32; 2]) {
     march_cell_index(x, position[0], &mut cursor.i);
     march_cell_index(y, position[1], &mut cursor.j);
     march_cell_index(z, position[2], &mut cursor.k);
@@ -333,21 +363,9 @@ fn trilinear_interpolation_with_cursor(
     let yd = ((position[1] - y[j]) / (y[j + 1] - y[j])).clamp(0.0, 1.0);
     let zd = ((position[2] - z[k]) / (z[k + 1] - z[k])).clamp(0.0, 1.0);
 
-    let mut c = 0.0;
-    for dx in 0..=1 {
-        for dy in 0..=1 {
-            for dz in 0..=1 {
-                let weight =
-                    (if dx == 0 { 1.0 - xd } else { xd }) *
-                    (if dy == 0 { 1.0 - yd } else { yd }) *
-                    (if dz == 0 { 1.0 - zd } else { zd });
+    let wx = [1.0 - xd, xd];
+    let wy = [1.0 - yd, yd];
+    let wz = [1.0 - zd, zd];
 
-                c += field[[i + dx, j + dy, k + dz]] * weight;
-            }
-        }
-    }
-
-    c
+    (i, j, k, wx, wy, wz)
 }
-
-

@@ -1,6 +1,6 @@
 [package]
 name = "rtrs"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 
 # [profile.release]
@@ -19,6 +19,7 @@ ndarray = { version = "0.16.1", features = ["serde"] }
 num-complex = "0.4.6"
 pyo3 = { version = "0.18", optional = true, features = ["extension-module", "auto-initialize"] }
 rayon = "1.8"
+indicatif = "0.17"
 
 [features]
 python = ["pyo3"]

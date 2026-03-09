@@ -598,6 +598,52 @@ def plot_rays_xy(rays):
     plt.grid()
     plt.tight_layout()
 
+def plot_tl_along_array(tl):
+    plt.figure()
+    plt.plot(tl)
+    plt.xlabel('Array index')
+    plt.ylabel('Transmission Loss (dB)')
+    plt.title('Transmission Loss along array')
+    plt.gca().invert_yaxis()
+    plt.grid()
+    plt.tight_layout()
+
+def plot_pressure_along_array(pressure):
+    plt.figure()
+    plt.plot(np.real(pressure))
+    plt.xlabel('Array index')
+    plt.ylabel('Pressure (real)')
+    plt.title('Pressure along array')
+    plt.grid()
+    plt.tight_layout()
+
+def plot_phase_along_array(pressure):
+    plt.figure()
+    plt.plot(np.angle(pressure))
+    plt.xlabel('Array index')
+    plt.ylabel('Phase (radians)')
+    plt.title('Phase along array')
+    plt.grid()
+    plt.tight_layout()
+
+def plot_array_geometry(x_m, y_m, z_m=None, source_pos=None, receiver_positions=None):
+    plt.figure()
+
+    # plt.plot(x_m, z_m, 'k-', lw=1.5, label='Array depth profile')
+    plt.plot(x_m, y_m, 'k-*', lw=1.5, label='Array horizontal profile')
+
+    if source_pos is not None:
+        plt.plot(source_pos[0], source_pos[1], 'r*', markersize=12, label='Source')
+    if receiver_positions is not None:
+        plt.scatter(receiver_positions[:, 0], receiver_positions[:, 1], c='b', marker='o', label='Receivers')
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.title('Array Geometry (top-down view)')
+    plt.axis('equal')
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+
 def plot_line_tl_x(tl, x_m, y_m, z_m, y_idx, z_idx):
     plt.figure()
     plt.plot(x_m, tl[:, y_idx, z_idx])

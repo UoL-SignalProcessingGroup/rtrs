@@ -14,7 +14,7 @@ import python_utils
 GEBCO_FILE = "bins/env_data/GEBCO_11_Apr_2025_cd1b685d47c9/gebco_2024_n61.25_s59.0_w-8.0_e-5.0.nc"
 COP_TEMP_FILE = "bins/env_data/cmems_mod_glo_phy-thetao_anfc_0.083deg_PT6H-i_thetao_8.00W-5.00W_59.00N-61.25N_0.49-5274.78m_2025-03-19.nc"
 COP_SAL_FILE = "bins/env_data/cmems_mod_glo_phy-so_anfc_0.083deg_PT6H-i_so_8.00W-5.00W_59.00N-61.25N_0.49-5274.78m_2025-03-19.nc"
-LAUNCH_SSP_DASHBOARD = True
+LAUNCH_SSP_DASHBOARD = False
 SSP_DASHBOARD_PORT = 8050
 
 
@@ -196,6 +196,55 @@ def make_env_json(x_reg, y_reg, bty_reg, z_reg, c_reg):
     bty_flat = np.transpose(np.asarray(bty_reg, dtype=float), (1, 0)).flatten(order="C")
     # print(bty_flat)
 
+    # ray paths
+    # return {
+    #     "ssp": {
+    #         "x_ssp_m": x_reg.tolist(),
+    #         "y_ssp_m": y_reg.tolist(),
+    #         "z_ssp_m": z_reg.tolist(),
+    #         "c_m_s": c_flat.tolist(),
+    #     },
+    #     "bathymetry": {
+    #         "x_bty_m": x_reg.tolist(),
+    #         "y_bty_m": y_reg.tolist(),
+    #         "z_bty_m": bty_flat.tolist(),
+    #         "water_density_g_cm3": 1.0,
+    #         "bottom_model": {
+    #             "model": "elastic",
+    #             "compressional_speed_m_s": 1700.0,
+    #             "shear_speed_m_s": 400.0,
+    #             "density_g_cm3": 1.6,
+    #             "compressional_attenuation_db_per_wavelength": 0.5,
+    #             "shear_attenuation_db_per_wavelength": 0.35,
+    #         },
+    #     },
+    #     "source": {
+    #         "position": [0.0, 0.0, 100.0],
+    #         "freq_hz": [200.0],
+    #         "launch_elev_deg": np.linspace(-15.0, 15.0, 5).tolist(),
+    #         "launch_azim_deg": np.linspace(0.0, 359.0, 9).tolist(),
+    #     },
+    #     "receivers": {
+    #         "config_type": "grid",
+    #         # "x_rcvr_m": np.linspace(x_reg.min(), x_reg.max(), 260).tolist(),
+    #         # "x_rcvr_m": np.linspace(-5000.0, 5000.0, 260).tolist(),
+    #         "x_rcvr_m": [0.0],
+    #         # "y_rcvr_m": np.linspace(y_reg.min(), y_reg.max(), 260).tolist(),
+    #         "y_rcvr_m": np.linspace(0.0, 50000, 260).tolist(),
+    #         # "z_rcvr_m": [100.0],
+    #         # "z_rcvr_m": np.linspace(z_reg.min(), z_reg.max(), 260).tolist(),
+    #         "z_rcvr_m": np.linspace(0.0, 2000.0, 260).tolist(),
+    #     },
+    #     "beam": {
+    #         "step_m": 25.0,
+    #         "max_steps": 100_000,
+    #         "max_range_m": 75_000.0,
+    #         "store_ray_paths": True,
+    #         "integration_method": "rk2",
+    #     },
+    # }
+
+    # x-y tl
     return {
         "ssp": {
             "x_ssp_m": x_reg.tolist(),
@@ -218,27 +267,28 @@ def make_env_json(x_reg, y_reg, bty_reg, z_reg, c_reg):
             },
         },
         "source": {
-            "position": [0.0, 0.0, 100.0],
-            "freq_hz": [200.0],
-            "launch_elev_deg": np.linspace(-15.0, 15.0, 5).tolist(),
-            "launch_azim_deg": np.linspace(0.0, 360.0, 9).tolist(),
+            "position": [0.0, 0.0, 50.0],
+            "freq_hz": [100.0],
+            "launch_elev_deg": np.linspace(-15.0, 15.0, 15).tolist(),
+            "launch_azim_deg": np.linspace(0.0, 359.0, 360).tolist(),
         },
         "receivers": {
             "config_type": "grid",
             # "x_rcvr_m": np.linspace(x_reg.min(), x_reg.max(), 260).tolist(),
-            # "x_rcvr_m": np.linspace(-5000.0, 5000.0, 260).tolist(),
-            "x_rcvr_m": [0.0],
+            "x_rcvr_m": np.linspace(-25000.0, 25000.0, 400).tolist(),
+            # "x_rcvr_m": [0.0],
             # "y_rcvr_m": np.linspace(y_reg.min(), y_reg.max(), 260).tolist(),
-            "y_rcvr_m": np.linspace(0.0, 50000, 260).tolist(),
-            # "z_rcvr_m": [100.0],
+            "y_rcvr_m": np.linspace(-25000.0, 25000, 400).tolist(),
+            "z_rcvr_m": [50.0],
             # "z_rcvr_m": np.linspace(z_reg.min(), z_reg.max(), 260).tolist(),
-            "z_rcvr_m": np.linspace(0.0, 2000.0, 260).tolist(),
+            # "z_rcvr_m": np.linspace(0.0, 2000.0, 260).tolist(),
         },
         "beam": {
-            "step_m": 25.0,
-            "max_steps": 100_000,
-            "max_range_m": 75_000.0,
-            "store_ray_paths": True,
+            "step_m": 15.0,
+            "max_steps": 50_000,
+            "max_range_m": 25_000.0,
+            "store_ray_paths": False,
+            "show_progress": True,
             "integration_method": "rk2",
         },
     }
@@ -304,17 +354,21 @@ def main():
     pressure = np.reshape(pressure, (len(freq), len(x_m), len(y_m), len(z_m)))
     tl = -20 * np.log10(np.maximum(np.abs(pressure), 1e-30))
 
-    rays = python_utils.load_rays(outfile)
-    # python_utils.plot_rays_yz_bty(rays, x_bty, y_bty, z_bty)
-    # python_utils.plot_rays_xz(rays)
-    # python_utils.plot_rays_yz(rays)
-    # python_utils.plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
-    python_utils.plot_rays_bty_3d_plotly(rays, x_bty, y_bty, z_bty, show=True, z_scale=0.05, force_equal_xy=True)
+    try: 
+        rays = python_utils.load_rays(outfile)
+        # python_utils.plot_rays_yz_bty(rays, x_bty, y_bty, z_bty)
+        # python_utils.plot_rays_xz(rays)
+        # python_utils.plot_rays_yz(rays)
+        # python_utils.plot_rays_bty_3d(rays, x_bty, y_bty, z_bty)
+        python_utils.plot_rays_bty_3d_plotly(rays, x_bty, y_bty, z_bty, show=True, z_scale=0.15, force_equal_xy=True)
+    except:
+        print("no ray paths stored, skipping ray plots")
 
 
     z_val = 10.0
     z_idx = (np.abs(z_m - z_val)).argmin()
     python_utils.plot_line_tl_y(tl[0, :, :, :], x_m, y_m, z_m, x_idx=len(x_m) // 2, z_idx=z_idx)
+    python_utils.plot_line_tl_x(tl[0, :, :, :], x_m, y_m, z_m, y_idx=len(y_m) // 2, z_idx=z_idx)
     python_utils.plot_tl_yz(tl[0, :, :, :], x_m, y_m, z_m, x_idx=len(x_m) // 2)
     python_utils.plot_tl_xy(tl[0, :, :, :], x_m, y_m, z_m, z_idx=z_idx)
     plot_bathymetry(x_bty, y_bty, z_bty)

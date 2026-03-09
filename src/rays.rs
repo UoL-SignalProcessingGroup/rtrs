@@ -1,20 +1,11 @@
 use crate::bty;
 use crate::input::config::{IntegrationMethod, SimulationConfig};
 use crate::ssp::{
-    init_ssp_cursor,
-    interpolate_c_with_cursor,
-    interpolate_grad_c_with_cursor,
-    interpolate_partials_c_with_cursor,
-    reduce_step_to_ssp_interfaces,
-    update_ssp_cursor,
-    calculate_ray_partials_c,
-    SSPCursor,
-    SSPFields
+    SSPCursor, SSPFields, calculate_ray_partials_c, init_ssp_cursor, interpolate_all_with_cursor,
+    interpolate_c_with_cursor, reduce_step_to_ssp_interfaces, update_ssp_cursor,
 };
 
-use crate::reflect::{
-    reflect_boundaries,
-};
+use crate::reflect::reflect_boundaries;
 
 #[derive(Clone, Copy)]
 pub struct BottomBounceMetadata {
@@ -27,7 +18,7 @@ pub struct BottomBounceMetadata {
 pub struct Ray {
     pub position: [f32; 3],
     pub direction: [f32; 3],
-    pub phi: f32, // ray torsion 
+    pub phi: f32, // ray torsion
     pub travel_time: f32,
     pub amplitude: f32,
     pub phase: f32,
@@ -53,13 +44,12 @@ struct RayDerivatives {
     c: f32,
 }
 
-
 pub fn trace_ray(
-    azim: f32, 
-    elev: f32, 
-    config: &SimulationConfig, 
+    azim: f32,
+    elev: f32,
+    config: &SimulationConfig,
     ssp_field: &SSPFields,
-    bty_field: &bty::BTYfield
+    bty_field: &bty::BTYfield,
 ) -> Vec<Ray> {
     // ray tracing main loop
 
@@ -71,7 +61,11 @@ pub fn trace_ray(
 
     let ray_init = Ray {
         position: config.source.position,
-        direction: [ elev.cos() * azim.sin() / c, elev.cos() * azim.cos() / c, elev.sin()/ c],
+        direction: [
+            elev.cos() * azim.sin() / c,
+            elev.cos() * azim.cos() / c,
+            elev.sin() / c,
+        ],
         phi: 0.0,
         travel_time: 0.0,
         amplitude: 1.0,
@@ -87,11 +81,13 @@ pub fn trace_ray(
         bottom_bounce: None,
     };
 
-    let mut ray_history: Vec<Ray> = Vec::with_capacity(max_n_steps);
+    let estimated_steps =
+        ((config.beam.max_range_m / config.beam.step_m).ceil() as usize).saturating_add(2);
+    let initial_capacity = estimated_steps.clamp(2, max_n_steps.max(2));
+    let mut ray_history: Vec<Ray> = Vec::with_capacity(initial_capacity);
     ray_history.push(ray_init);
 
     for step in 0..max_n_steps {
-
         match config.beam.integration_method {
             IntegrationMethod::Euler => {
                 euler_step_ray(
@@ -121,10 +117,14 @@ pub fn trace_ray(
         reflect_boundaries(&mut ray_history, bty_field, &mut bty_cursor);
 
         // check for max range termination conditions
-        if check_max_range(&mut ray_history, config.beam.max_range_m, config.source.position) {
+        if check_max_range(
+            &ray_history,
+            config.beam.max_range_m,
+            config.source.position,
+        ) {
             break;
         }
-        
+
         // check for number of bottom bounces
         // if ray_history.last().unwrap().num_bottom_bounces >= 10 {
         //     break;
@@ -133,7 +133,6 @@ pub fn trace_ray(
 
     return ray_history;
 }
-
 
 fn reduce_step_to_boundaries(
     position: [f32; 3],
@@ -157,16 +156,18 @@ fn reduce_step_to_boundaries(
         }
     }
 
-    let z_bty0 = bty::interpolate_bty_with_cursor(position, bty_field, bty_cursor);
-    let (normal, _) = bty::bottom_normal_at_with_cursor(position, bty_field, bty_cursor);
+    bty::update_bty_cursor(position, bty_field, bty_cursor);
+    let z_bty0 = bty::interpolate_bty_from_cursor(position, bty_field, bty_cursor);
+    let (normal, _) = bty::bottom_normal_from_cursor(position, bty_field, bty_cursor);
 
     let boundary_point = [position[0], position[1], z_bty0];
-    let n_dot_u = normal[0] * unit_direction[0] + normal[1] * unit_direction[1] + normal[2] * unit_direction[2];
+    let n_dot_u = normal[0] * unit_direction[0]
+        + normal[1] * unit_direction[1]
+        + normal[2] * unit_direction[2];
     if n_dot_u.abs() > eps {
-        let n_dot_s_minus_p =
-            normal[0] * (boundary_point[0] - position[0]) +
-            normal[1] * (boundary_point[1] - position[1]) +
-            normal[2] * (boundary_point[2] - position[2]);
+        let n_dot_s_minus_p = normal[0] * (boundary_point[0] - position[0])
+            + normal[1] * (boundary_point[1] - position[1])
+            + normal[2] * (boundary_point[2] - position[2]);
         let h_bot = n_dot_s_minus_p / n_dot_u;
         if h_bot > eps && h_bot < h {
             h = h_bot;
@@ -176,7 +177,6 @@ fn reduce_step_to_boundaries(
     let min_step = 1.0e-6_f32 * step;
     if h < min_step { min_step } else { h }
 }
-
 
 fn euler_step_ray(
     ray_history: &mut Vec<Ray>,
@@ -262,7 +262,6 @@ fn euler_step_ray(
     let last_pos = ray_history.last().unwrap().position;
     update_ssp_cursor(last_pos, ssp, ssp_cursor);
     bty::update_bty_cursor(last_pos, bty_field, bty_cursor);
-
 }
 
 fn midpoint_rk2_step_ray(
@@ -380,15 +379,18 @@ fn compute_ray_derivatives(
     ssp: &SSPFields,
     ssp_cursor: &mut SSPCursor,
 ) -> RayDerivatives {
-    let c = interpolate_c_with_cursor(ray.position, ssp, ssp_cursor);
-    let grad_c = interpolate_grad_c_with_cursor(ray.position, ssp, ssp_cursor);
-    let partial_c = interpolate_partials_c_with_cursor(ray.position, ssp, ssp_cursor);
+    let (c, grad_c, partial_c) = interpolate_all_with_cursor(ray.position, ssp, ssp_cursor);
 
     let (e1, e2) = ray_normal(ray.direction, ray.phi, c);
     let [cnn, cmn, cmm] = calculate_ray_partials_c(
-        partial_c[0], partial_c[3], partial_c[4],
-        partial_c[1], partial_c[5], partial_c[2],
-        e1, e2,
+        partial_c[0],
+        partial_c[3],
+        partial_c[4],
+        partial_c[1],
+        partial_c[5],
+        partial_c[2],
+        e1,
+        e2,
     );
 
     let d_position = [
@@ -406,8 +408,7 @@ fn compute_ray_derivatives(
 
     let denom = ray.direction[0].powi(2) + ray.direction[1].powi(2);
     let d_phi = if denom > 1.0e-12 {
-        c.recip() * ray.direction[2]
-            * (ray.direction[1] * grad_c[0] - ray.direction[0] * grad_c[1])
+        c.recip() * ray.direction[2] * (ray.direction[1] * grad_c[0] - ray.direction[0] * grad_c[1])
             / denom
     } else {
         0.0
@@ -421,18 +422,12 @@ fn compute_ray_derivatives(
         c11 * ray.q_tilde[0] + c12 * ray.q_tilde[1],
         c12 * ray.q_tilde[0] + c22 * ray.q_tilde[1],
     ];
-    let d_q_tilde = [
-        c * ray.p_tilde[0],
-        c * ray.p_tilde[1],
-    ];
+    let d_q_tilde = [c * ray.p_tilde[0], c * ray.p_tilde[1]];
     let d_p_hat = [
         c11 * ray.q_hat[0] + c12 * ray.q_hat[1],
         c12 * ray.q_hat[0] + c22 * ray.q_hat[1],
     ];
-    let d_q_hat = [
-        c * ray.p_hat[0],
-        c * ray.p_hat[1],
-    ];
+    let d_q_hat = [c * ray.p_hat[0], c * ray.p_hat[1]];
 
     RayDerivatives {
         d_position,
@@ -445,7 +440,6 @@ fn compute_ray_derivatives(
         c,
     }
 }
-
 
 pub fn ray_normal(direction: [f32; 3], phi: f32, c: f32) -> ([f32; 3], [f32; 3]) {
     // compute the ray normal vector e1, e2
@@ -479,11 +473,10 @@ pub fn ray_normal(direction: [f32; 3], phi: f32, c: f32) -> ([f32; 3], [f32; 3])
     return (e1, e2);
 }
 
-
-fn check_max_range(ray_history: &mut Vec<Ray>, max_range: f32, source_position: [f32; 3]) -> bool {
+fn check_max_range(ray_history: &[Ray], max_range: f32, source_position: [f32; 3]) -> bool {
     let ray = ray_history.last().unwrap();
     let dx = ray.position[0] - source_position[0];
     let dy = ray.position[1] - source_position[1];
-    let range = (dx.powi(2) + dy.powi(2)).sqrt();
-    range >= max_range
+    let range_sq = dx * dx + dy * dy;
+    range_sq >= max_range * max_range
 }
