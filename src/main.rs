@@ -1,12 +1,12 @@
+mod bty;
+mod engine;
+mod influence;
 mod input;
 mod output;
 mod rays;
-mod ssp;
-mod bty;
 mod reflect;
-mod influence;
+mod ssp;
 mod utils;
-mod engine;
 
 use anyhow::Result;
 use std::fs;
@@ -35,11 +35,13 @@ fn load_config(path: &str) -> Result<SimulationConfig> {
 }
 
 fn main() -> Result<()> {
-
     // Load config from JSON
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <config.json>", args.get(0).unwrap_or(&"rtrs".into()));
+        eprintln!(
+            "Usage: {} <config.json>",
+            args.get(0).unwrap_or(&"rtrs".into())
+        );
         return Ok(());
     }
     let in_path = &args[1];
@@ -59,8 +61,3 @@ fn main() -> Result<()> {
     write_json(out_path_str, &config, ray_paths.as_ref(), &pressure_field)?;
     Ok(())
 }
-
-
-
-
-

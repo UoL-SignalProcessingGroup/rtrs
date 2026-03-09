@@ -114,14 +114,13 @@ pub fn reduce_step_to_bty_segments(
 }
 
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
-
     let (nx, ny) = (
         confg.bathymetry.x_bty_m.len(),
         confg.bathymetry.y_bty_m.len(),
     );
 
-    let z_bty = Array2::from_shape_vec((nx, ny), confg.bathymetry.z_bty_m.clone())
-        .expect(&format!(
+    let z_bty =
+        Array2::from_shape_vec((nx, ny), confg.bathymetry.z_bty_m.clone()).expect(&format!(
             "z_bty_m does not match grid dimensions: nx = {}, ny = {}, bty_len = {}",
             nx,
             ny,
@@ -137,7 +136,8 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
         } => BottomBoundaryRuntimeModel::Acoustic {
             compressional_speed_m_s: *compressional_speed_m_s,
             density_g_cm3: *density_g_cm3,
-            compressional_attenuation_db_per_wavelength: compressional_attenuation_db_per_wavelength.unwrap_or(0.0),
+            compressional_attenuation_db_per_wavelength:
+                compressional_attenuation_db_per_wavelength.unwrap_or(0.0),
         },
         BottomBoundaryInputModel::Elastic {
             compressional_speed_m_s,
@@ -149,7 +149,8 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
             compressional_speed_m_s: *compressional_speed_m_s,
             shear_speed_m_s: *shear_speed_m_s,
             density_g_cm3: *density_g_cm3,
-            compressional_attenuation_db_per_wavelength: compressional_attenuation_db_per_wavelength.unwrap_or(0.0),
+            compressional_attenuation_db_per_wavelength:
+                compressional_attenuation_db_per_wavelength.unwrap_or(0.0),
             shear_attenuation_db_per_wavelength: shear_attenuation_db_per_wavelength.unwrap_or(0.0),
         },
     };
@@ -163,21 +164,28 @@ pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
     };
 
     return bty_field;
-
 }
 
-pub fn interpolate_bty_with_cursor(position: [f32; 3], bty_field: &BTYfield, cursor: &mut BTYCursor) -> f32 {
-    update_bty_cursor(position, bty_field, cursor);
-    bilinear_interpolation_with_indices(position, &bty_field.z, &bty_field.x, &bty_field.y, cursor.i, cursor.j)
-}
-
-pub fn bottom_normal_at_with_cursor(
+pub fn interpolate_bty_from_cursor(
     position: [f32; 3],
     bty_field: &BTYfield,
-    cursor: &mut BTYCursor,
-) -> ([f32; 3], [f32; 3]) {
-    update_bty_cursor(position, bty_field, cursor);
+    cursor: &BTYCursor,
+) -> f32 {
+    bilinear_interpolation_with_indices(
+        position,
+        &bty_field.z,
+        &bty_field.x,
+        &bty_field.y,
+        cursor.i,
+        cursor.j,
+    )
+}
 
+pub fn bottom_normal_from_cursor(
+    position: [f32; 3],
+    bty_field: &BTYfield,
+    cursor: &BTYCursor,
+) -> ([f32; 3], [f32; 3]) {
     let i = cursor.i;
     let j = cursor.j;
 
@@ -232,8 +240,7 @@ fn bilinear_interpolation_with_indices(
     for dx in 0..=1 {
         for dy in 0..=1 {
             let weight =
-                (if dx == 0 { 1.0 - xd } else { xd }) *
-                (if dy == 0 { 1.0 - yd } else { yd });
+                (if dx == 0 { 1.0 - xd } else { xd }) * (if dy == 0 { 1.0 - yd } else { yd });
 
             c += field[[i + dx, j + dy]] * weight;
         }

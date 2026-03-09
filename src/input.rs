@@ -1,10 +1,16 @@
 pub mod config {
-    use anyhow::{bail, Result};
+    use anyhow::{Result, bail};
     use serde::Deserialize;
 
-    fn default_none_f32() -> Option<f32> { None }
-    fn default_true() -> bool { true }
-    fn default_integration_method() -> IntegrationMethod { IntegrationMethod::Euler }
+    fn default_none_f32() -> Option<f32> {
+        None
+    }
+    fn default_false() -> bool {
+        false
+    }
+    fn default_integration_method() -> IntegrationMethod {
+        IntegrationMethod::Euler
+    }
 
     #[derive(Debug, Deserialize)]
     pub struct SoundSpeed {
@@ -40,7 +46,9 @@ pub mod config {
         pub bottom_model: BottomBoundaryModel,
     }
 
-    fn default_bottom_boundary_model() -> BottomBoundaryModel { BottomBoundaryModel::Rigid }
+    fn default_bottom_boundary_model() -> BottomBoundaryModel {
+        BottomBoundaryModel::Rigid
+    }
 
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "snake_case", tag = "model")]
@@ -76,7 +84,10 @@ pub mod config {
                         errors.push("bathymetry.bottom_model: acoustic compressional_speed_m_s must be positive".into());
                     }
                     if *density_g_cm3 <= 0.0 {
-                        errors.push("bathymetry.bottom_model: acoustic density_g_cm3 must be positive".into());
+                        errors.push(
+                            "bathymetry.bottom_model: acoustic density_g_cm3 must be positive"
+                                .into(),
+                        );
                     }
                     if let Some(value) = compressional_attenuation_db_per_wavelength {
                         if *value < 0.0 {
@@ -95,10 +106,16 @@ pub mod config {
                         errors.push("bathymetry.bottom_model: elastic compressional_speed_m_s must be positive".into());
                     }
                     if *shear_speed_m_s <= 0.0 {
-                        errors.push("bathymetry.bottom_model: elastic shear_speed_m_s must be positive".into());
+                        errors.push(
+                            "bathymetry.bottom_model: elastic shear_speed_m_s must be positive"
+                                .into(),
+                        );
                     }
                     if *density_g_cm3 <= 0.0 {
-                        errors.push("bathymetry.bottom_model: elastic density_g_cm3 must be positive".into());
+                        errors.push(
+                            "bathymetry.bottom_model: elastic density_g_cm3 must be positive"
+                                .into(),
+                        );
                     }
                     if let Some(value) = compressional_attenuation_db_per_wavelength {
                         if *value < 0.0 {
@@ -122,7 +139,9 @@ pub mod config {
             }
             if let Some(value) = self.water_density_g_cm3 {
                 if value <= 0.0 {
-                    errors.push("bathymetry: water_density_g_cm3 must be positive when provided".into());
+                    errors.push(
+                        "bathymetry: water_density_g_cm3 must be positive when provided".into(),
+                    );
                 }
             }
             self.bottom_model.validate(errors);
@@ -193,8 +212,10 @@ pub mod config {
         pub step_m: f32,
         pub max_steps: usize,
         pub max_range_m: f32,
-        #[serde(default = "default_true")]
+        #[serde(default = "default_false")]
         pub store_ray_paths: bool,
+        #[serde(default = "default_false")]
+        pub show_progress: bool,
         #[serde(default = "default_integration_method")]
         pub integration_method: IntegrationMethod,
     }

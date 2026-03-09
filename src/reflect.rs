@@ -1,15 +1,16 @@
 use crate::bty::{
-    bottom_normal_at_with_cursor,
-    interpolate_bty_with_cursor,
-    BottomBoundaryRuntimeModel,
-    BTYCursor,
-    BTYfield,
+    BTYCursor, BTYfield, BottomBoundaryRuntimeModel, bottom_normal_from_cursor,
+    interpolate_bty_from_cursor, update_bty_cursor,
 };
-use crate::rays::{ray_normal, BottomBounceMetadata, Ray};
+use crate::rays::{BottomBounceMetadata, Ray, ray_normal};
 use num_complex::Complex32;
 use std::f32::consts::PI;
 
-pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_cursor: &mut BTYCursor) {
+pub fn reflect_boundaries(
+    ray_history: &mut Vec<Ray>,
+    bty_field: &BTYfield,
+    bty_cursor: &mut BTYCursor,
+) {
     let ray = ray_history.last_mut().unwrap();
     ray.bottom_bounce = None;
 
@@ -37,7 +38,9 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
         boundary_normal_for_paraxial = normal;
 
         // reflect direction across plane
-        let d_dot_n = ray.direction[0]*normal[0] + ray.direction[1]*normal[1] + ray.direction[2]*normal[2];
+        let d_dot_n = ray.direction[0] * normal[0]
+            + ray.direction[1] * normal[1]
+            + ray.direction[2] * normal[2];
         ray.direction[0] = ray.direction[0] - 2.0 * d_dot_n * normal[0];
         ray.direction[1] = ray.direction[1] - 2.0 * d_dot_n * normal[1];
         ray.direction[2] = ray.direction[2] - 2.0 * d_dot_n * normal[2];
@@ -51,23 +54,31 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
         ray.num_top_bounces += 1;
         ray.phase += PI; // vacuum phase inversion
 
-        // proceed to paraxial update below
+    // proceed to paraxial update below
     } else {
         // Bottom: check against interpolated bottom depth
-        let z_bty = interpolate_bty_with_cursor(ray.position, bty_field, bty_cursor);
+        update_bty_cursor(ray.position, bty_field, bty_cursor);
+        let z_bty = interpolate_bty_from_cursor(ray.position, bty_field, bty_cursor);
         if ray.position[2] >= z_bty && ray.direction[2] > 0.0 {
             let incident_slowness = ray.direction;
             incident_slowness_for_paraxial = incident_slowness;
 
             // compute local bottom normal
-            let (mut normal, _tangent) = bottom_normal_at_with_cursor(ray.position, bty_field, bty_cursor);
-            if normal[2] < 0.0 { normal = [-normal[0], -normal[1], -normal[2]]; }
+            let (mut normal, _tangent) =
+                bottom_normal_from_cursor(ray.position, bty_field, bty_cursor);
+            if normal[2] < 0.0 {
+                normal = [-normal[0], -normal[1], -normal[2]];
+            }
             boundary_normal_for_paraxial = normal;
 
             // intersect ray with local plane point
             let s = [ray.position[0], ray.position[1], z_bty];
-            let n_dot_d = normal[0]*ray.direction[0] + normal[1]*ray.direction[1] + normal[2]*ray.direction[2];
-            let n_dot_s_minus_p = normal[0]*(s[0]-ray.position[0]) + normal[1]*(s[1]-ray.position[1]) + normal[2]*(s[2]-ray.position[2]);
+            let n_dot_d = normal[0] * ray.direction[0]
+                + normal[1] * ray.direction[1]
+                + normal[2] * ray.direction[2];
+            let n_dot_s_minus_p = normal[0] * (s[0] - ray.position[0])
+                + normal[1] * (s[1] - ray.position[1])
+                + normal[2] * (s[2] - ray.position[2]);
             const EPS: f32 = 1e-12;
             if n_dot_d.abs() > EPS {
                 let t_plane = n_dot_s_minus_p / n_dot_d;
@@ -79,7 +90,9 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
             }
 
             // reflect direction about local normal
-            let d_dot_n = ray.direction[0]*normal[0] + ray.direction[1]*normal[1] + ray.direction[2]*normal[2];
+            let d_dot_n = ray.direction[0] * normal[0]
+                + ray.direction[1] * normal[1]
+                + ray.direction[2] * normal[2];
             ray.direction[0] = ray.direction[0] - 2.0 * d_dot_n * normal[0];
             ray.direction[1] = ray.direction[1] - 2.0 * d_dot_n * normal[1];
             ray.direction[2] = ray.direction[2] - 2.0 * d_dot_n * normal[2];
@@ -89,7 +102,7 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
             ray.position[0] -= nudge * normal[0];
             ray.position[1] -= nudge * normal[1];
             ray.position[2] -= nudge * normal[2];
-            
+
             ray.num_bottom_bounces += 1;
             ray.bottom_bounce = Some(BottomBounceMetadata {
                 boundary_normal: normal,
@@ -115,7 +128,11 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
     let (e1, e2) = ray_normal(inc_dir, ray.phi, c_local);
 
     // Build rayt (scaled tangent) and rayn2, rayn1 as in bellhop's CalcTangent_Normals
-    let rayt = [c_local * inc_dir[0], c_local * inc_dir[1], c_local * inc_dir[2]];
+    let rayt = [
+        c_local * inc_dir[0],
+        c_local * inc_dir[1],
+        c_local * inc_dir[2],
+    ];
     // choose boundary normal for constructing rayn2: surface -> [0,0,1], bottom -> local normal
     // We will reuse the normal computed earlier when present; reconstruct if necessary
     let bdry_n = boundary_normal_for_paraxial;
@@ -125,8 +142,10 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
         -(rayt[2] * bdry_n[0] - rayt[0] * bdry_n[2]),
         -(rayt[0] * bdry_n[1] - rayt[1] * bdry_n[0]),
     ];
-    let r2norm = (rayn2[0]*rayn2[0] + rayn2[1]*rayn2[1] + rayn2[2]*rayn2[2]).sqrt();
-    if r2norm > 0.0 { rayn2 = [rayn2[0]/r2norm, rayn2[1]/r2norm, rayn2[2]/r2norm]; }
+    let r2norm = (rayn2[0] * rayn2[0] + rayn2[1] * rayn2[1] + rayn2[2] * rayn2[2]).sqrt();
+    if r2norm > 0.0 {
+        rayn2 = [rayn2[0] / r2norm, rayn2[1] / r2norm, rayn2[2] / r2norm];
+    }
     let rayn1 = [
         -(rayt[1] * rayn2[2] - rayt[2] * rayn2[1]),
         -(rayt[2] * rayn2[0] - rayt[0] * rayn2[2]),
@@ -134,16 +153,28 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
     ];
 
     // Rotation matrix entries (RotMat): Rot(1,1)=dot(rayn1,e1), Rot(1,2)=dot(rayn1,e2)
-    let rot11 = rayn1[0]*e1[0] + rayn1[1]*e1[1] + rayn1[2]*e1[2];
-    let rot12 = rayn1[0]*e2[0] + rayn1[1]*e2[1] + rayn1[2]*e2[2];
+    let rot11 = rayn1[0] * e1[0] + rayn1[1] * e1[1] + rayn1[2] * e1[2];
+    let rot12 = rayn1[0] * e2[0] + rayn1[1] * e2[1] + rayn1[2] * e2[2];
     let rot21 = -rot12;
-    let rot22 = rayn2[0]*e2[0] + rayn2[1]*e2[1] + rayn2[2]*e2[2];
+    let rot22 = rayn2[0] * e2[0] + rayn2[1] * e2[1] + rayn2[2] * e2[2];
 
     // rotate p/q into rayn basis
-    let p_tilde_in = [rot11 * ray.p_tilde[0] + rot12 * ray.p_hat[0], rot11 * ray.p_tilde[1] + rot12 * ray.p_hat[1]];
-    let p_hat_in   = [rot21 * ray.p_tilde[0] + rot22 * ray.p_hat[0], rot21 * ray.p_tilde[1] + rot22 * ray.p_hat[1]];
-    let q_tilde_in = [rot11 * ray.q_tilde[0] + rot12 * ray.q_hat[0], rot11 * ray.q_tilde[1] + rot12 * ray.q_hat[1]];
-    let q_hat_in   = [rot21 * ray.q_tilde[0] + rot22 * ray.q_hat[0], rot21 * ray.q_tilde[1] + rot22 * ray.q_hat[1]];
+    let p_tilde_in = [
+        rot11 * ray.p_tilde[0] + rot12 * ray.p_hat[0],
+        rot11 * ray.p_tilde[1] + rot12 * ray.p_hat[1],
+    ];
+    let p_hat_in = [
+        rot21 * ray.p_tilde[0] + rot22 * ray.p_hat[0],
+        rot21 * ray.p_tilde[1] + rot22 * ray.p_hat[1],
+    ];
+    let q_tilde_in = [
+        rot11 * ray.q_tilde[0] + rot12 * ray.q_hat[0],
+        rot11 * ray.q_tilde[1] + rot12 * ray.q_hat[1],
+    ];
+    let q_hat_in = [
+        rot21 * ray.q_tilde[0] + rot22 * ray.q_hat[0],
+        rot21 * ray.q_tilde[1] + rot22 * ray.q_hat[1],
+    ];
 
     // bellhop has model-dependent curvature corrections
     // curvature corrections R1,R2,R3 are model-dependent;
@@ -152,23 +183,27 @@ pub fn reflect_boundaries(ray_history: &mut Vec<Ray>, bty_field: &BTYfield, bty_
     let r3 = 0.0_f32;
 
     // apply curvature change (bellhop formulas)
-    let p_tilde_out = [p_tilde_in[0] + q_tilde_in[0] * r1 - q_hat_in[0] * r2,
-                       p_tilde_in[1] + q_tilde_in[1] * r1 - q_hat_in[1] * r2];
-    let p_hat_out   = [p_hat_in[0]   + q_tilde_in[0] * r2 + q_hat_in[0] * r3,
-                       p_hat_in[1]   + q_tilde_in[1] * r2 + q_hat_in[1] * r3];
+    let p_tilde_out = [
+        p_tilde_in[0] + q_tilde_in[0] * r1 - q_hat_in[0] * r2,
+        p_tilde_in[1] + q_tilde_in[1] * r1 - q_hat_in[1] * r2,
+    ];
+    let p_hat_out = [
+        p_hat_in[0] + q_tilde_in[0] * r2 + q_hat_in[0] * r3,
+        p_hat_in[1] + q_tilde_in[1] * r2 + q_hat_in[1] * r3,
+    ];
 
     // rotate back to e1,e2 (Rot^T)
     ray.p_tilde[0] = rot11 * p_tilde_out[0] + rot21 * p_hat_out[0];
     ray.p_tilde[1] = rot11 * p_tilde_out[1] + rot21 * p_hat_out[1];
-    ray.p_hat  [0] = rot12 * p_tilde_out[0] + rot22 * p_hat_out[0];
-    ray.p_hat  [1] = rot12 * p_tilde_out[1] + rot22 * p_hat_out[1];
+    ray.p_hat[0] = rot12 * p_tilde_out[0] + rot22 * p_hat_out[0];
+    ray.p_hat[1] = rot12 * p_tilde_out[1] + rot22 * p_hat_out[1];
 
     // Fortran left q unchanged through the curvature correction; keep q as-is
     // update det_q
-    ray.det_q = ray.q_tilde[0]*ray.q_hat[1] - ray.q_tilde[1]*ray.q_hat[0];
+    ray.det_q = ray.q_tilde[0] * ray.q_hat[1] - ray.q_tilde[1] * ray.q_hat[0];
 
     // update phi as bellhop does
-    let dot_r = (rayn1[0]*e1[0] + rayn1[1]*e1[1] + rayn1[2]*e1[2]).clamp(-1.0, 1.0);
+    let dot_r = (rayn1[0] * e1[0] + rayn1[1] * e1[1] + rayn1[2] * e1[2]).clamp(-1.0, 1.0);
     ray.phi = ray.phi + 2.0 * dot_r.acos();
 }
 
@@ -250,12 +285,11 @@ pub fn compute_bottom_reflection_coefficient(
             compressional_attenuation_db_per_wavelength,
         } => {
             // Convert user attenuation units (dB/lambda) to Np/m at this frequency.
-            let compressional_attenuation_np_per_m =
-                attenuation_db_per_wavelength_to_np_per_m(
-                    *compressional_attenuation_db_per_wavelength,
-                    *compressional_speed_m_s,
-                    omega_abs,
-                );
+            let compressional_attenuation_np_per_m = attenuation_db_per_wavelength_to_np_per_m(
+                *compressional_attenuation_db_per_wavelength,
+                *compressional_speed_m_s,
+                omega_abs,
+            );
             let bottom_compressional_speed = complex_wave_speed_from_attenuation(
                 *compressional_speed_m_s,
                 compressional_attenuation_np_per_m,
@@ -289,12 +323,11 @@ pub fn compute_bottom_reflection_coefficient(
             shear_attenuation_db_per_wavelength,
         } => {
             // Convert both P and S attenuation values to Np/m.
-            let compressional_attenuation_np_per_m =
-                attenuation_db_per_wavelength_to_np_per_m(
-                    *compressional_attenuation_db_per_wavelength,
-                    *compressional_speed_m_s,
-                    omega_abs,
-                );
+            let compressional_attenuation_np_per_m = attenuation_db_per_wavelength_to_np_per_m(
+                *compressional_attenuation_db_per_wavelength,
+                *compressional_speed_m_s,
+                omega_abs,
+            );
             let shear_attenuation_np_per_m = attenuation_db_per_wavelength_to_np_per_m(
                 *shear_attenuation_db_per_wavelength,
                 *shear_speed_m_s,
@@ -312,17 +345,19 @@ pub fn compute_bottom_reflection_coefficient(
                 omega_abs,
             );
 
-            let horizontal_wavenumber_sq = Complex32::new(horizontal_wavenumber * horizontal_wavenumber, 0.0);
-            let vertical_wavenumber_bottom_s_sq =
-                horizontal_wavenumber_sq - complex_omega_over_speed_sq(omega_abs, bottom_shear_speed);
-            let vertical_wavenumber_bottom_p_sq =
-                horizontal_wavenumber_sq - complex_omega_over_speed_sq(omega_abs, bottom_compressional_speed);
+            let horizontal_wavenumber_sq =
+                Complex32::new(horizontal_wavenumber * horizontal_wavenumber, 0.0);
+            let vertical_wavenumber_bottom_s_sq = horizontal_wavenumber_sq
+                - complex_omega_over_speed_sq(omega_abs, bottom_shear_speed);
+            let vertical_wavenumber_bottom_p_sq = horizontal_wavenumber_sq
+                - complex_omega_over_speed_sq(omega_abs, bottom_compressional_speed);
 
             let vertical_wavenumber_bottom_s = stable_complex_sqrt(vertical_wavenumber_bottom_s_sq);
             let vertical_wavenumber_bottom_p = stable_complex_sqrt(vertical_wavenumber_bottom_p_sq);
 
             // Bellhop elastic halfspace terms (f, g) with shear-coupled boundary conditions.
-            let shear_modulus = Complex32::new(*density_g_cm3, 0.0) * bottom_shear_speed * bottom_shear_speed;
+            let shear_modulus =
+                Complex32::new(*density_g_cm3, 0.0) * bottom_shear_speed * bottom_shear_speed;
 
             let y2 = ((vertical_wavenumber_bottom_s_sq + horizontal_wavenumber_sq)
                 * (vertical_wavenumber_bottom_s_sq + horizontal_wavenumber_sq)
@@ -368,7 +403,10 @@ fn attenuation_db_per_wavelength_to_np_per_m(
     phase_speed_m_s: f32,
     angular_frequency_rad_s: f32,
 ) -> f32 {
-    if attenuation_db_per_wavelength <= 0.0 || phase_speed_m_s <= 0.0 || angular_frequency_rad_s <= 0.0 {
+    if attenuation_db_per_wavelength <= 0.0
+        || phase_speed_m_s <= 0.0
+        || angular_frequency_rad_s <= 0.0
+    {
         return 0.0;
     }
     let frequency_hz = angular_frequency_rad_s / (2.0 * PI);
@@ -377,7 +415,10 @@ fn attenuation_db_per_wavelength_to_np_per_m(
     nepers_per_wavelength / wavelength_m
 }
 
-fn complex_omega_over_speed_sq(angular_frequency_rad_s: f32, wave_speed_m_s: Complex32) -> Complex32 {
+fn complex_omega_over_speed_sq(
+    angular_frequency_rad_s: f32,
+    wave_speed_m_s: Complex32,
+) -> Complex32 {
     // Convenience helper for (omega / c)^2 in complex arithmetic.
     let omega_complex = Complex32::new(angular_frequency_rad_s, 0.0);
     let ratio = omega_complex / wave_speed_m_s;
@@ -464,4 +505,3 @@ mod tests {
         assert_eq!(reflection, Complex32::new(1.0, 0.0));
     }
 }
-

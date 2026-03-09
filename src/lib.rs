@@ -2,14 +2,14 @@
 
 // declare crate modules at library root so both the CLI (main.rs) and the python
 // extension see the same module tree
+mod bty;
+mod engine;
+mod influence;
 mod input;
 mod rays;
-mod ssp;
-mod bty;
 mod reflect;
-mod influence;
+mod ssp;
 mod utils;
-mod engine;
 
 #[cfg(feature = "python")]
 mod python_bindings;

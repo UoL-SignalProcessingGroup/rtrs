@@ -6,8 +6,8 @@ use serde::{Serialize, Serializer};
 use std::fs::File;
 use std::io::BufWriter;
 
-use crate::input::config::SimulationConfig;
 use crate::influence::PressureField;
+use crate::input::config::SimulationConfig;
 
 struct RayPathsOut<'a> {
     ray_paths: &'a [Vec<[f32; 3]>],

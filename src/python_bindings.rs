@@ -1,13 +1,13 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 #[cfg(feature = "python")]
+use pyo3::exceptions::PyRuntimeError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyAny;
 #[cfg(feature = "python")]
 use pyo3::types::PyDict;
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyRuntimeError;
 
 #[cfg(feature = "python")]
 use crate::engine;
@@ -17,8 +17,11 @@ use crate::input::config::SimulationConfig;
 #[cfg(feature = "python")]
 #[pyfunction]
 fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
-    let json_mod = py.import("json").map_err(|e| PyRuntimeError::new_err(format!("failed to import json: {}", e)))?;
-    let json_str: String = json_mod.call_method1("dumps", (py_cfg,))
+    let json_mod = py
+        .import("json")
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to import json: {}", e)))?;
+    let json_str: String = json_mod
+        .call_method1("dumps", (py_cfg,))
         .map_err(|e| PyRuntimeError::new_err(format!("json.dumps failed: {}", e)))?
         .extract()
         .map_err(|e| PyRuntimeError::new_err(format!("extract json string failed: {}", e)))?;
@@ -28,9 +31,10 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
     let mut cfg: SimulationConfig = serde_ignored::deserialize(&mut de, |path| {
         unknown_fields.push(path.to_string());
     })
-        .map_err(|e| PyRuntimeError::new_err(format!("failed to parse config JSON: {}", e)))?;
+    .map_err(|e| PyRuntimeError::new_err(format!("failed to parse config JSON: {}", e)))?;
 
-    let mut warnings = cfg.validate()
+    let mut warnings = cfg
+        .validate()
         .map_err(|e| PyRuntimeError::new_err(format!("invalid simulation config: {}", e)))?;
 
     warnings.extend(
@@ -41,10 +45,12 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
 
     // Surface validation warnings as Python warnings so they are visible regardless of environment
     if !warnings.is_empty() {
-        let warnings_mod = py.import("warnings")
+        let warnings_mod = py
+            .import("warnings")
             .map_err(|e| PyRuntimeError::new_err(format!("failed to import warnings: {}", e)))?;
         for w in &warnings {
-            warnings_mod.call_method1("warn", (format!("rtrs: {}", w),))
+            warnings_mod
+                .call_method1("warn", (format!("rtrs: {}", w),))
                 .map_err(|e| PyRuntimeError::new_err(format!("warnings.warn failed: {}", e)))?;
         }
     }
@@ -93,7 +99,9 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
             .expect("receiver_positions_m present for array mode");
         p_out
             .set_item("receiver_positions_m", receiver_positions)
-            .map_err(|e| PyRuntimeError::new_err(format!("failed to set receiver_positions_m: {}", e)))?;
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("failed to set receiver_positions_m: {}", e))
+            })?;
     } else {
         p_out
             .set_item("x_m", &pressure_field.x_m)
