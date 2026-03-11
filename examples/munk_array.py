@@ -38,9 +38,8 @@ env_m = {
     },
     "source": {
         "position": [0.0, 0.0, 1000.0],
-        "freq_hz": [500.0],
-        # "freq_hz": np.linspace(-1000.0, 1000.0, 2000).tolist(),
-        # "freq_hz": np.linspace(50.0, 1000.0, 1000).tolist(),
+        # "freq_hz": [500.0],
+        "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
         "launch_elev_deg": np.linspace(-20.0, 20.0, 200).tolist(),
         # "launch_elev_deg": [0.0],
         # "launch_azim_deg": [0.0]
@@ -90,9 +89,11 @@ except:
     print(pressure.shape)
     print(f"array length: {np.sqrt((np.max(x_m) - np.min(x_m))**2 + (np.max(y_m) - np.min(y_m))**2)}")
     print(f"array element spacing: {np.sqrt( (x_m[1] - x_m[0])**2 + (y_m[1] - y_m[0])**2 )} m")
+    print(f"time taken per frequency: {(t1 - t0) / len(freq):.4f} seconds")
+    freq_idx = len(freq) // 2
     tl = - 20 * np.log10(np.abs(pressure))
-    python_utils.plot_tl_along_array(tl[0, :, 0, 0])
-    python_utils.plot_pressure_along_array(pressure[0,:,0,0])
+    python_utils.plot_tl_along_array(tl[freq_idx,:,0,0])
+    python_utils.plot_pressure_along_array(pressure[freq_idx,:,0,0])
     python_utils.plot_array_geometry(x_m, y_m, z_m)
     
 
