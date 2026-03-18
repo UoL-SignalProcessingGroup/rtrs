@@ -23,7 +23,37 @@ There are 3 main ways to use rtrs: directly with Rust and Cargo, with Python bin
 git clone https://github.com/fincb/rtrs.git
 cd rtrs
 ```
-Rust, Cargo, and are required for all methods, Python is also required for the Python bindings. 
+Rust, Cargo, and are required for all methods, Python is also required for the Python bindings. The recommended way (for linux and macos) to install Rust and Cargo is with `rustup`:
+```bash
+curl https://sh.rustup.rs -sSf | sh
+```
+
+Then check:
+```bash
+rustc --version
+cargo --version
+rustup --version
+```
+
+### Building the Docs
+
+The documentation is built with Cargo. To build the docs locally, run:
+```bash
+cargo doc --no-deps --features python
+```
+
+Or to open the docs in the browser after building:
+```bash
+cargo doc --no-deps --features python --open
+```
+
+The generated docs include user-facing guide pages under `rtrs::guides`:
+
+- `rtrs::guides::install_and_build`
+- `rtrs::guides::input_reference`
+- `rtrs::guides::output_reference`
+- `rtrs::guides::python_usage`
+
 
 ### Rust & Cargo Build and Run
 
@@ -117,6 +147,11 @@ Hopefully, pre-built wheels are distributed per platform and Python version via 
 - Low frequency correction
 - Performance improvements
 - Multiple sources and Source directivity patterns
+
+## Documentation
+- Primary docs via `cargo doc` (guides and API together)
+- JSON schema: `docs/schema/simulation-config.schema.json`
+
 
 ## License
 MIT License. See LICENSE file for details.

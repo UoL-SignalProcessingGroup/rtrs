@@ -2,12 +2,14 @@ use crate::input::config::SimulationConfig;
 use ndarray::Array3;
 
 #[derive(Clone, Copy, Debug)]
+/// Cursor that tracks the current sound-speed cell index.
 pub struct SSPCursor {
     pub i: usize,
     pub j: usize,
     pub k: usize,
 }
 
+/// Sound-speed field and precomputed first/second derivatives.
 pub struct SSPFields {
     x: Vec<f32>,
     y: Vec<f32>,
@@ -56,6 +58,7 @@ fn march_cell_index(arr: &[f32], val: f32, idx: &mut usize) {
     }
 }
 
+/// Initialize an SSP cursor at a world position.
 pub fn init_ssp_cursor(position: [f32; 3], ssp: &SSPFields) -> SSPCursor {
     SSPCursor {
         i: find_cell_index(&ssp.x, position[0]),
@@ -100,6 +103,7 @@ pub fn reduce_step_to_ssp_interfaces(
     h
 }
 
+/// Build SSP fields and derivatives from validated simulation input.
 pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
     let (nx, ny, nz) = (
         config.ssp.x_ssp_m.len(),
@@ -147,6 +151,7 @@ pub fn init_ssp(config: &SimulationConfig) -> SSPFields {
     return ssp_field;
 }
 
+/// Interpolate local sound speed at a position using the supplied cursor.
 pub fn interpolate_c_with_cursor(
     position: [f32; 3],
     ssp: &SSPFields,
@@ -155,6 +160,7 @@ pub fn interpolate_c_with_cursor(
     trilinear_interpolation_with_cursor(position, &ssp.c, &ssp.x, &ssp.y, &ssp.z, cursor)
 }
 
+/// Interpolate sound speed, gradient, and Hessian components at a position.
 pub fn interpolate_all_with_cursor(
     position: [f32; 3],
     ssp: &SSPFields,

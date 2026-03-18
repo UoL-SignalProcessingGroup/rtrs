@@ -187,6 +187,7 @@ impl Serialize for PressureFieldOut<'_> {
     }
 }
 
+/// Write simulation outputs to the JSON schema used by examples and Python tools.
 pub fn write_json(
     file_path: &str,
     simulation_config: &SimulationConfig,

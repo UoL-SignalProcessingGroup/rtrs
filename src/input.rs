@@ -1,3 +1,4 @@
+/// JSON-deserializable simulation input schema and validation helpers.
 pub mod config {
     use anyhow::{Result, bail};
     use serde::Deserialize;
@@ -13,6 +14,7 @@ pub mod config {
     }
 
     #[derive(Debug, Deserialize)]
+    /// Sound-speed grid and values (flattened in x-y-z order).
     pub struct SoundSpeed {
         pub x_ssp_m: Vec<f32>, // x (m)
         pub y_ssp_m: Vec<f32>, // y (m)
@@ -36,6 +38,7 @@ pub mod config {
     }
 
     #[derive(Debug, Deserialize)]
+    /// Bathymetry grid, depths, and bottom boundary configuration.
     pub struct Bathymetry {
         pub x_bty_m: Vec<f32>, // x (m)
         pub y_bty_m: Vec<f32>, // y (m)
@@ -52,6 +55,7 @@ pub mod config {
 
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "snake_case", tag = "model")]
+    /// Bottom boundary model parameters.
     pub enum BottomBoundaryModel {
         Rigid,
         Acoustic {
@@ -149,6 +153,7 @@ pub mod config {
     }
 
     #[derive(Debug, Deserialize)]
+    /// Source position, frequency list, and launch angle sets.
     pub struct Source {
         pub position: [f32; 3], // x, y, z (m)
         pub freq_hz: Vec<f32>,
@@ -176,6 +181,7 @@ pub mod config {
     }
 
     #[derive(Debug, Deserialize)]
+    /// Receiver configuration in either grid or explicit array mode.
     pub struct Receivers {
         pub config_type: String, // "grid" or "array"
         // if the config_type is "grid" then the receivers are bellow are the axis vecotors
@@ -202,12 +208,14 @@ pub mod config {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
+    /// ODE integration method for ray propagation.
     pub enum IntegrationMethod {
         Euler,
         Rk2,
     }
 
     #[derive(Debug, Deserialize)]
+    /// Numerical ray-tracing and beam-accumulation settings.
     pub struct BeamSettings {
         pub step_m: f32,
         pub max_steps: usize,
@@ -237,6 +245,7 @@ pub mod config {
     }
 
     #[derive(Debug, Deserialize)]
+    /// Full input configuration for one simulation run.
     pub struct SimulationConfig {
         pub ssp: SoundSpeed,
         pub bathymetry: Bathymetry,
@@ -246,6 +255,9 @@ pub mod config {
     }
 
     impl SimulationConfig {
+        /// Validate and normalize the configuration.
+        ///
+        /// Returns non-fatal warnings when validation passes.
         pub fn validate(&mut self) -> Result<Vec<String>> {
             let mut errors: Vec<String> = Vec::new();
             let mut warnings: Vec<String> = Vec::new();

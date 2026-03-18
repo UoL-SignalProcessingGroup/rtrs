@@ -28,6 +28,10 @@ fn merge_pressure_fields(dst: &mut PressureField, src: &PressureField) {
         });
 }
 
+/// Run the full simulation for all launch-angle combinations.
+///
+/// Returns optional ray paths (when enabled in config) and the accumulated
+/// receiver pressure field.
 pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureField) {
     // convert angles to radians
     let launch_elev_rad: Vec<f32> = cfg

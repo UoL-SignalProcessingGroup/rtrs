@@ -1,4 +1,5 @@
 #![allow(unsafe_op_in_unsafe_fn)]
+//! Python bindings for running rtrs simulations from Python.
 
 #[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
@@ -15,8 +16,23 @@ use crate::engine;
 use crate::input::config::SimulationConfig;
 
 #[cfg(feature = "python")]
-#[pyfunction]
-fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
+#[pyfunction(text_signature = "(py_cfg, /)")]
+/// Run an rtrs simulation from a Python configuration object.
+///
+/// Parameters
+/// ----------
+/// py_cfg : dict-like
+///     Simulation configuration following the rtrs input schema.
+///
+/// Returns
+/// -------
+/// dict
+///     Output dictionary containing `pressure_field` and optional `ray_paths`.
+///
+/// Notes
+/// -----
+/// Unknown config keys are ignored and emitted as Python warnings.
+pub fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
     let json_mod = py
         .import("json")
         .map_err(|e| PyRuntimeError::new_err(format!("failed to import json: {}", e)))?;
@@ -140,8 +156,13 @@ fn run_simulation(py: Python, py_cfg: &PyAny) -> PyResult<PyObject> {
 }
 
 #[cfg(feature = "python")]
+/// Python extension module exposing rtrs simulation functions.
 #[pymodule]
 fn rtrs(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add(
+        "__doc__",
+        "Python bindings for the rtrs underwater acoustic ray tracer.",
+    )?;
     m.add_function(wrap_pyfunction!(run_simulation, m)?)?;
     Ok(())
 }

@@ -2,12 +2,14 @@ use crate::input::config::{BottomBoundaryModel as BottomBoundaryInputModel, Simu
 use ndarray::Array2;
 
 #[derive(Clone, Copy, Debug)]
+/// Cursor that tracks the current bathymetry cell index.
 pub struct BTYCursor {
     pub i: usize,
     pub j: usize,
 }
 
 #[derive(Clone)]
+/// Runtime bottom model with defaults resolved from input.
 pub enum BottomBoundaryRuntimeModel {
     Rigid,
     Acoustic {
@@ -24,6 +26,7 @@ pub enum BottomBoundaryRuntimeModel {
     },
 }
 
+/// Bathymetry grid and runtime bottom parameters.
 pub struct BTYfield {
     pub x: Vec<f32>,
     pub y: Vec<f32>,
@@ -64,6 +67,7 @@ fn march_cell_index(arr: &[f32], val: f32, idx: &mut usize) {
     }
 }
 
+/// Initialize a bathymetry cursor at a world position.
 pub fn init_bty_cursor(position: [f32; 3], bty: &BTYfield) -> BTYCursor {
     BTYCursor {
         i: find_cell_index(&bty.x, position[0]),
@@ -113,6 +117,7 @@ pub fn reduce_step_to_bty_segments(
     h
 }
 
+/// Build bathymetry runtime fields from validated simulation input.
 pub fn init_bty(confg: &SimulationConfig) -> BTYfield {
     let (nx, ny) = (
         confg.bathymetry.x_bty_m.len(),

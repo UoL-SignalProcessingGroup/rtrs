@@ -9,9 +9,9 @@ use num_complex::Complex32;
 use std::cmp::Ordering;
 use std::f32::consts::PI;
 
+/// Receiver-domain pressure outputs for all frequencies.
 pub struct PressureField {
-    // 3D pressure field array [x, y, z] with complex values
-    // now 4D: [freq, x, y, z]
+    // 4D: [freq, x, y, z]
     pub pressure: Array4<Complex32>, // [nfreq, x,y,z]
     pub x_m: Vec<f32>,
     pub y_m: Vec<f32>,
@@ -24,6 +24,7 @@ pub struct PressureField {
     pub amplitude: Array3<f32>, // [x,y,z]
 }
 
+/// Build an empty pressure field container for the configured receiver layout.
 pub fn init_pressure_field(config: &SimulationConfig) -> PressureField {
     // initialize empty pressure field
     let nfreq = config.source.freq_hz.len();
@@ -120,6 +121,7 @@ fn scale_beam(elev: f32, d_elev: f32, d_azim: f32, ray: &mut [Ray]) {
     // ratio1
 }
 
+/// Accumulate Gaussian beam contributions from one traced ray into receivers.
 pub fn gaussian_beam_influence(
     ray_history: &mut Vec<Ray>,
     pressure_field: &mut PressureField,

@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/rtrs/simulation-config.schema.json",
+  "title": "rtrs SimulationConfig",
+  "description": "Input schema for the rtrs standalone binary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ssp",
+    "bathymetry",
+    "source",
+    "receivers",
+    "beam"
+  ],
+  "properties": {
+    "ssp": {
+      "$ref": "#/$defs/soundSpeed"
+    },
+    "bathymetry": {
+      "$ref": "#/$defs/bathymetry"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "receivers": {
+      "$ref": "#/$defs/receivers"
+    },
+    "beam": {
+      "$ref": "#/$defs/beam"
+    }
+  },
+  "$defs": {
+    "numberArray": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "soundSpeed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_ssp_m",
+        "y_ssp_m",
+        "z_ssp_m",
+        "c_m_s"
+      ],
+      "properties": {
+        "x_ssp_m": {
+          "$ref": "#/$defs/numberArray",
+          "description": "SSP x-axis coordinates in meters."
+        },
+        "y_ssp_m": {
+          "$ref": "#/$defs/numberArray",
+          "description": "SSP y-axis coordinates in meters."
+        },
+        "z_ssp_m": {
+          "$ref": "#/$defs/numberArray",
+          "description": "SSP z-axis coordinates in meters (positive down)."
+        },
+        "c_m_s": {
+          "$ref": "#/$defs/numberArray",
+          "minItems": 1,
+          "description": "Flattened sound speed values in m/s.",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "bottomModelRigid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model"
+      ],
+      "properties": {
+        "model": {
+          "const": "rigid"
+        }
+      }
+    },
+    "bottomModelAcoustic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "compressional_speed_m_s",
+        "density_g_cm3"
+      ],
+      "properties": {
+        "model": {
+          "const": "acoustic"
+        },
+        "compressional_speed_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "density_g_cm3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "compressional_attenuation_db_per_wavelength": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "bottomModelElastic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "compressional_speed_m_s",
+        "shear_speed_m_s",
+        "density_g_cm3"
+      ],
+      "properties": {
+        "model": {
+          "const": "elastic"
+        },
+        "compressional_speed_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shear_speed_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "density_g_cm3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "compressional_attenuation_db_per_wavelength": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shear_attenuation_db_per_wavelength": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "bathymetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_bty_m",
+        "y_bty_m",
+        "z_bty_m"
+      ],
+      "properties": {
+        "x_bty_m": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "y_bty_m": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "z_bty_m": {
+          "$ref": "#/$defs/numberArray",
+          "minItems": 1
+        },
+        "water_density_g_cm3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bottom_model": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/bottomModelRigid"
+            },
+            {
+              "$ref": "#/$defs/bottomModelAcoustic"
+            },
+            {
+              "$ref": "#/$defs/bottomModelElastic"
+            }
+          ],
+          "default": {
+            "model": "rigid"
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "freq_hz",
+        "launch_elev_deg",
+        "launch_azim_deg"
+      ],
+      "properties": {
+        "position": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Source position [x, y, z] in meters (z positive down)."
+        },
+        "freq_hz": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "launch_elev_deg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          }
+        },
+        "launch_azim_deg": {
+          "$ref": "#/$defs/numberArray"
+        }
+      }
+    },
+    "receivers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_type",
+        "x_rcvr_m",
+        "y_rcvr_m",
+        "z_rcvr_m"
+      ],
+      "properties": {
+        "config_type": {
+          "type": "string",
+          "enum": [
+            "grid",
+            "array"
+          ]
+        },
+        "x_rcvr_m": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "y_rcvr_m": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "z_rcvr_m": {
+          "$ref": "#/$defs/numberArray"
+        }
+      }
+    },
+    "beam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_m",
+        "max_steps",
+        "max_range_m"
+      ],
+      "properties": {
+        "step_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_range_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "store_ray_paths": {
+          "type": "boolean",
+          "default": false
+        },
+        "show_progress": {
+          "type": "boolean",
+          "default": false
+        },
+        "atomic_progress_counter": {
+          "type": "boolean",
+          "default": false
+        },
+        "integration_method": {
+          "type": "string",
+          "enum": [
+            "euler",
+            "rk2"
+          ],
+          "default": "euler"
+        }
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ use crate::ssp::{
 use crate::reflect::reflect_boundaries;
 
 #[derive(Clone, Copy)]
+/// Bottom interaction metadata recorded at bounce events.
 pub struct BottomBounceMetadata {
     pub boundary_normal: [f32; 3],
     pub incident_slowness: [f32; 3],
@@ -15,6 +16,7 @@ pub struct BottomBounceMetadata {
 }
 
 #[derive(Clone)]
+/// Per-step ray state used by tracing and beam influence calculations.
 pub struct Ray {
     pub position: [f32; 3],
     pub direction: [f32; 3],
@@ -44,6 +46,7 @@ struct RayDerivatives {
     c: f32,
 }
 
+/// Trace a single ray for one launch azimuth/elevation pair.
 pub fn trace_ray(
     azim: f32,
     elev: f32,
