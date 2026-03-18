@@ -1,9 +1,9 @@
 # rtrs
 
-3D Underwater acoustic ray tracing in Rust.
+3D Underwater acoustic ray tracing with arbitrary Cartesian receiver coordinates, geometry independent broadband beam tracing, and Python bindings.
 
 ## Current Features
-- 3D ray / beam tracing
+- Exclusively 3D ray / beam tracing
 - Surface (vacuum) and bottom (rigid, lossy acoustic, lossy elastic) reflections
 - 3D sound speed profiles ( $c(x,y,z)$ )
 - 2D bathymetry ( $b(x,y)$ )
@@ -16,13 +16,16 @@
 - Euler and RK2 integration methods
 - Input validation
 
-## Planned Features
-- Low frequency correction
-- Performance improvements
+## Installing, Building, and Running
 
-## Usage
+There are 3 main ways to use rtrs: directly with Rust and Cargo, with Python bindings, or using CLI with the pre-built binary and JSON input files (Not covered here). The first step is to clone the repository and navigate to the project directory:
+```bash
+git clone https://github.com/fincb/rtrs.git
+cd rtrs
+```
+Rust, Cargo, and are required for all methods, Python is also required for the Python bindings. 
 
-### Rust
+### Rust & Cargo Build and Run
 
 Build with cargo (the resulting binary will be in `target/release/`):
 ```bash
@@ -34,7 +37,7 @@ Run with a JSON input file (compiles and runs in release mode):
 cargo run --release <path_to_input_file>.json
 ```
 
-### Python Bindings Normal Build
+### Python Bindings Normal Build and Run
 
 Set up a virtual environment and install dependencies:
 ```bash
@@ -47,6 +50,14 @@ or with conda:
 ```
 conda activate <env_name>
 pip install -e .
+```
+
+Then in a Python script the package can be imported and used:
+```python
+import rtrs
+
+env = # <Dictionary with environment parameters>
+result = rtrs.run_simulation(env)
 ```
 
 ### Python Bindings with plotting for examples
@@ -86,12 +97,7 @@ For plotting and development, install both extras:
 pip install -e ".[dev,viz]"
 ```
 
-Build the Rust extension into the active environment:
-```bash
-maturin develop --release
-```
-
-Rebuild after any changes to the Rust code:
+Build the Rust extension into the active environment and to rebuild after any changes to the Rust code:
 ```bash
 maturin develop --release
 ```
@@ -106,6 +112,11 @@ pip install rtrs
 ```
 
 Hopefully, pre-built wheels are distributed per platform and Python version via GitHub Actions using `maturin-action`, so no Rust toolchain is required.
+
+## Possible Future Features
+- Low frequency correction
+- Performance improvements
+- Multiple sources and Source directivity patterns
 
 ## License
 MIT License. See LICENSE file for details.
