@@ -451,6 +451,83 @@ fn stable_complex_sqrt(value: Complex32) -> Complex32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bty::{BTYfield, BottomBoundaryRuntimeModel, init_bty_cursor};
+    use crate::rays::Ray;
+    use ndarray::Array2;
+
+    const TEST_C: f32 = 1500.0;
+
+    fn approx_eq(a: f32, b: f32, tol: f32) {
+        assert!(
+            (a - b).abs() <= tol,
+            "expected {a} ~= {b} within tol={tol}"
+        );
+    }
+
+    fn make_ray(position: [f32; 3], direction: [f32; 3]) -> Ray {
+        Ray {
+            position,
+            direction,
+            phi: 0.0,
+            travel_time: 0.0,
+            amplitude: 1.0,
+            phase: 0.0,
+            num_top_bounces: 0,
+            num_bottom_bounces: 0,
+            p_tilde: [1.0, 0.0],
+            q_tilde: [0.0, 0.0],
+            p_hat: [0.0, 1.0],
+            q_hat: [0.0, 0.0],
+            det_q: 0.0,
+            c: TEST_C,
+            bottom_bounce: None,
+        }
+    }
+
+    fn make_bty_flat(depth_m: f32) -> BTYfield {
+        BTYfield {
+            x: vec![0.0, 10.0],
+            y: vec![0.0, 10.0],
+            z: Array2::from_shape_vec((2, 2), vec![depth_m, depth_m, depth_m, depth_m]).unwrap(),
+            bottom_model: BottomBoundaryRuntimeModel::Rigid,
+            water_density_g_cm3: 1.0,
+        }
+    }
+
+    fn make_bty_sloped_x(z00: f32, z10: f32) -> BTYfield {
+        BTYfield {
+            x: vec![0.0, 10.0],
+            y: vec![0.0, 10.0],
+            z: Array2::from_shape_vec((2, 2), vec![z00, z00, z10, z10]).unwrap(),
+            bottom_model: BottomBoundaryRuntimeModel::Rigid,
+            water_density_g_cm3: 1.0,
+        }
+    }
+
+    fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    }
+
+    fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+        [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+    }
+
+    fn mul(a: [f32; 3], s: f32) -> [f32; 3] {
+        [a[0] * s, a[1] * s, a[2] * s]
+    }
+
+    fn assert_specular_about_normal(incident: [f32; 3], reflected: [f32; 3], normal: [f32; 3]) {
+        // Specular reflection keeps tangential component and flips normal component.
+        let d_in_n = dot(incident, normal);
+        let d_out_n = dot(reflected, normal);
+        approx_eq(d_out_n, -d_in_n, 5.0e-7);
+
+        let in_t = sub(incident, mul(normal, d_in_n));
+        let out_t = sub(reflected, mul(normal, d_out_n));
+        approx_eq(in_t[0], out_t[0], 5.0e-7);
+        approx_eq(in_t[1], out_t[1], 5.0e-7);
+        approx_eq(in_t[2], out_t[2], 5.0e-7);
+    }
 
     #[test]
     fn negative_frequency_is_conjugate_of_positive_for_acoustic_bottom() {
@@ -503,5 +580,96 @@ mod tests {
         );
 
         assert_eq!(reflection, Complex32::new(1.0, 0.0));
+    }
+
+    #[test]
+    fn surface_reflection_obeys_specular_law_for_various_incidence_angles() {
+        let bty = make_bty_flat(100.0);
+        let normal = [0.0, 0.0, -1.0];
+        let directions = [
+            [0.0, 0.0, -1.0 / TEST_C],
+            [0.25 / TEST_C, 0.0, -0.96824586 / TEST_C],
+            [0.6 / TEST_C, 0.3 / TEST_C, -0.7416199 / TEST_C],
+            [0.9999 / TEST_C, 0.0, -0.014141782 / TEST_C],
+        ];
+
+        for direction in directions {
+            let mut ray_history = vec![make_ray([5.0, 5.0, -1.0e-4], direction)];
+            let mut cursor = init_bty_cursor(ray_history[0].position, &bty);
+
+            reflect_boundaries(&mut ray_history, &bty, &mut cursor);
+
+            let reflected = ray_history.last().unwrap();
+            assert_specular_about_normal(direction, reflected.direction, normal);
+            assert_eq!(reflected.num_top_bounces, 1);
+            assert_eq!(reflected.num_bottom_bounces, 0);
+            assert!(reflected.direction[2] > 0.0);
+        }
+    }
+
+    #[test]
+    fn flat_bottom_reflection_obeys_specular_law_for_various_incidence_angles() {
+        let bty = make_bty_flat(100.0);
+        let normal = [0.0, 0.0, 1.0];
+        let directions = [
+            [0.0, 0.0, 1.0 / TEST_C],
+            [0.2 / TEST_C, 0.0, 0.9797959 / TEST_C],
+            [0.5 / TEST_C, 0.4 / TEST_C, 0.76811457 / TEST_C],
+            [0.9999 / TEST_C, 0.0, 0.014141782 / TEST_C],
+        ];
+
+        for direction in directions {
+            let mut ray_history = vec![make_ray([5.0, 5.0, 100.0 + 1.0e-4], direction)];
+            let mut cursor = init_bty_cursor(ray_history[0].position, &bty);
+
+            reflect_boundaries(&mut ray_history, &bty, &mut cursor);
+
+            let reflected = ray_history.last().unwrap();
+            assert_specular_about_normal(direction, reflected.direction, normal);
+            assert_eq!(reflected.num_top_bounces, 0);
+            assert_eq!(reflected.num_bottom_bounces, 1);
+            assert!(reflected.direction[2] < 0.0);
+            assert!(reflected.bottom_bounce.is_some());
+        }
+    }
+
+    #[test]
+    fn sloped_bottom_reflection_obeys_specular_law() {
+        // 10 m rise over 10 m run gives dz/dx = 1.0, so normal is proportional to [-1, 0, 1].
+        let bty = make_bty_sloped_x(100.0, 110.0);
+        let normal = [-1.0 / 2.0_f32.sqrt(), 0.0, 1.0 / 2.0_f32.sqrt()];
+
+        let incident = [0.2 / TEST_C, 0.0, 0.9797959 / TEST_C];
+        let mut ray_history = vec![make_ray([5.0, 5.0, 105.0 + 1.0e-4], incident)];
+        let mut cursor = init_bty_cursor(ray_history[0].position, &bty);
+
+        reflect_boundaries(&mut ray_history, &bty, &mut cursor);
+
+        let reflected = ray_history.last().unwrap();
+        assert_specular_about_normal(incident, reflected.direction, normal);
+        assert_eq!(reflected.num_bottom_bounces, 1);
+        assert!(reflected.bottom_bounce.is_some());
+    }
+
+    #[test]
+    fn grazing_and_non_incident_edge_cases_do_not_reflect() {
+        let bty = make_bty_flat(100.0);
+
+        // Grazing along the surface (dz = 0) should not trigger top reflection.
+        let mut surface_history = vec![make_ray([5.0, 5.0, 0.0], [0.5 / TEST_C, 0.0, 0.0])];
+        let mut surface_cursor = init_bty_cursor(surface_history[0].position, &bty);
+        reflect_boundaries(&mut surface_history, &bty, &mut surface_cursor);
+        let surface_ray = surface_history.last().unwrap();
+        assert_eq!(surface_ray.num_top_bounces, 0);
+        approx_eq(surface_ray.direction[0], 0.5 / TEST_C, 1.0e-12);
+        approx_eq(surface_ray.direction[2], 0.0, 1.0e-12);
+
+        // Ray exactly on bottom but moving upward should not trigger bottom reflection.
+        let mut bottom_history = vec![make_ray([5.0, 5.0, 100.0], [0.0, 0.0, -1.0 / TEST_C])];
+        let mut bottom_cursor = init_bty_cursor(bottom_history[0].position, &bty);
+        reflect_boundaries(&mut bottom_history, &bty, &mut bottom_cursor);
+        let bottom_ray = bottom_history.last().unwrap();
+        assert_eq!(bottom_ray.num_bottom_bounces, 0);
+        approx_eq(bottom_ray.direction[2], -1.0 / TEST_C, 1.0e-12);
     }
 }
