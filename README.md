@@ -37,7 +37,10 @@ rustup --version
 
 ### Building the Docs
 
-The documentation is built with Cargo. To build the docs locally, run:
+- Primary docs via `cargo doc` (guides and API together)
+- JSON schema: `docs/schema/simulation-config.schema.json`
+
+The primary documentation is built with `cargo doc` (guides and API together). To build the docs locally, run:
 ```bash
 cargo doc --no-deps --features python
 ```
@@ -54,6 +57,7 @@ The generated docs include user-facing guide pages under `rtrs::guides`:
 - `rtrs::guides::output_reference`
 - `rtrs::guides::python_usage`
 
+The json schema can be found here `docs/schema/simulation-config.schema.json`.
 
 ### Rust & Cargo Build and Run
 
@@ -147,11 +151,6 @@ Hopefully, pre-built wheels are distributed per platform and Python version via 
 - Low frequency correction
 - Performance improvements
 - Multiple sources and Source directivity patterns
-
-## Documentation
-- Primary docs via `cargo doc` (guides and API together)
-- JSON schema: `docs/schema/simulation-config.schema.json`
-
 
 ## License
 MIT License. See LICENSE file for details.
