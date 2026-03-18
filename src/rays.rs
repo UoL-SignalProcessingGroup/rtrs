@@ -137,6 +137,7 @@ pub fn trace_ray(
     return ray_history;
 }
 
+/// Function reduces step to stop rays from crossing interfaces in ssp or bty
 fn reduce_step_to_boundaries(
     position: [f32; 3],
     unit_direction: [f32; 3],
@@ -482,4 +483,162 @@ fn check_max_range(ray_history: &[Ray], max_range: f32, source_position: [f32; 3
     let dy = ray.position[1] - source_position[1];
     let range_sq = dx * dx + dy * dy;
     range_sq >= max_range * max_range
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bty::init_bty;
+    use crate::input::config::{
+        Bathymetry, BeamSettings, BottomBoundaryModel, Receivers, SoundSpeed, Source,
+    };
+    use crate::ssp::init_ssp;
+
+    fn base_config_with_grids(
+        ssp_x: Vec<f32>,
+        ssp_y: Vec<f32>,
+        ssp_z: Vec<f32>,
+        bty_x: Vec<f32>,
+        bty_y: Vec<f32>,
+        bottom_depth_m: f32,
+    ) -> SimulationConfig {
+        let ssp_len = ssp_x.len() * ssp_y.len() * ssp_z.len();
+        let bty_len = bty_x.len() * bty_y.len();
+
+        SimulationConfig {
+            ssp: SoundSpeed {
+                x_ssp_m: ssp_x,
+                y_ssp_m: ssp_y,
+                z_ssp_m: ssp_z,
+                c_m_s: vec![1500.0; ssp_len],
+            },
+            bathymetry: Bathymetry {
+                x_bty_m: bty_x,
+                y_bty_m: bty_y,
+                z_bty_m: vec![bottom_depth_m; bty_len],
+                water_density_g_cm3: Some(1.0),
+                bottom_model: BottomBoundaryModel::Rigid,
+            },
+            source: Source {
+                position: [0.0, 0.0, 5.0],
+                freq_hz: vec![100.0],
+                launch_elev_deg: vec![0.0],
+                launch_azim_deg: vec![0.0],
+            },
+            receivers: Receivers {
+                config_type: "grid".to_string(),
+                x_rcvr_m: vec![0.0],
+                y_rcvr_m: vec![0.0],
+                z_rcvr_m: vec![5.0],
+            },
+            beam: BeamSettings {
+                step_m: 1.0,
+                max_steps: 10,
+                max_range_m: 50.0,
+                store_ray_paths: false,
+                show_progress: false,
+                atomic_progress_counter: false,
+                integration_method: IntegrationMethod::Euler,
+            },
+        }
+    }
+
+    #[test]
+    fn reduce_step_to_boundaries_limits_to_top_surface_crossing() {
+        let cfg = base_config_with_grids(
+            vec![0.0, 20.0],
+            vec![0.0, 20.0],
+            vec![0.0, 50.0],
+            vec![0.0, 20.0],
+            vec![0.0, 20.0],
+            100.0,
+        );
+        let ssp = init_ssp(&cfg);
+        let bty = init_bty(&cfg);
+
+        let position = [10.0, 10.0, 8.0];
+        let direction = [0.2, 0.0, -1.0];
+        let step = 100.0;
+
+        let ssp_cursor = init_ssp_cursor(position, &ssp);
+        let mut bty_cursor = bty::init_bty_cursor(position, &bty);
+
+        let h = reduce_step_to_boundaries(
+            position,
+            direction,
+            step,
+            &ssp,
+            &ssp_cursor,
+            &bty,
+            &mut bty_cursor,
+        );
+
+        assert!((h - 8.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn reduce_step_to_boundaries_limits_to_bottom_intersection() {
+        let cfg = base_config_with_grids(
+            vec![0.0, 20.0],
+            vec![0.0, 20.0],
+            vec![0.0, 50.0],
+            vec![0.0, 20.0],
+            vec![0.0, 20.0],
+            12.0,
+        );
+        let ssp = init_ssp(&cfg);
+        let bty = init_bty(&cfg);
+
+        let position = [10.0, 10.0, 10.0];
+        let direction = [0.0, 0.0, 1.0];
+        let step = 25.0;
+
+        let ssp_cursor = init_ssp_cursor(position, &ssp);
+        let mut bty_cursor = bty::init_bty_cursor(position, &bty);
+
+        let h = reduce_step_to_boundaries(
+            position,
+            direction,
+            step,
+            &ssp,
+            &ssp_cursor,
+            &bty,
+            &mut bty_cursor,
+        );
+
+        assert!((h - 2.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn reduce_step_to_boundaries_clamps_to_minimum_step() {
+        let cfg = base_config_with_grids(
+            vec![0.0, 10.0, 20.0],
+            vec![0.0, 20.0],
+            vec![0.0, 50.0],
+            vec![0.0, 10.0, 20.0],
+            vec![0.0, 20.0],
+            100.0,
+        );
+        let ssp = init_ssp(&cfg);
+        let bty = init_bty(&cfg);
+
+        let position = [9.999_999, 10.0, 10.0];
+        let direction = [1.0, 0.0, 0.0];
+        let step = 10.0;
+
+        let ssp_cursor = init_ssp_cursor(position, &ssp);
+        let mut bty_cursor = bty::init_bty_cursor(position, &bty);
+
+        let h = reduce_step_to_boundaries(
+            position,
+            direction,
+            step,
+            &ssp,
+            &ssp_cursor,
+            &bty,
+            &mut bty_cursor,
+        );
+
+        assert!((h - 1.0e-5).abs() < 1.0e-10);
+    }
 }

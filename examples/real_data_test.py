@@ -270,7 +270,7 @@ def make_env_json(x_reg, y_reg, bty_reg, z_reg, c_reg):
             "position": [0.0, 0.0, 50.0],
             "freq_hz": [100.0],
             "launch_elev_deg": np.linspace(-15.0, 15.0, 15).tolist(),
-            "launch_azim_deg": np.linspace(0.0, 359.0, 360).tolist(),
+            "launch_azim_deg": np.linspace(0.0, 359.25, 480).tolist(),
         },
         "receivers": {
             "config_type": "grid",
@@ -284,8 +284,8 @@ def make_env_json(x_reg, y_reg, bty_reg, z_reg, c_reg):
             # "z_rcvr_m": np.linspace(0.0, 2000.0, 260).tolist(),
         },
         "beam": {
-            "step_m": 15.0,
-            "max_steps": 50_000,
+            "step_m": 25.0,
+            "max_steps": 5_000,
             "max_range_m": 25_000.0,
             "store_ray_paths": False,
             "show_progress": True,

@@ -375,3 +375,122 @@ fn update_cursor_and_weights(
 
     (i, j, k, wx, wy, wz)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::config::{
+        Bathymetry, BeamSettings, BottomBoundaryModel, IntegrationMethod, Receivers, SimulationConfig,
+        SoundSpeed, Source,
+    };
+
+    fn base_config_with_ssp(x: Vec<f32>, y: Vec<f32>, z: Vec<f32>, c_m_s: Vec<f32>) -> SimulationConfig {
+        SimulationConfig {
+            ssp: SoundSpeed {
+                x_ssp_m: x,
+                y_ssp_m: y,
+                z_ssp_m: z,
+                c_m_s,
+            },
+            bathymetry: Bathymetry {
+                x_bty_m: vec![0.0, 10.0],
+                y_bty_m: vec![0.0, 10.0],
+                z_bty_m: vec![100.0; 4],
+                water_density_g_cm3: Some(1.0),
+                bottom_model: BottomBoundaryModel::Rigid,
+            },
+            source: Source {
+                position: [0.0, 0.0, 5.0],
+                freq_hz: vec![100.0],
+                launch_elev_deg: vec![0.0],
+                launch_azim_deg: vec![0.0],
+            },
+            receivers: Receivers {
+                config_type: "grid".to_string(),
+                x_rcvr_m: vec![0.0],
+                y_rcvr_m: vec![0.0],
+                z_rcvr_m: vec![5.0],
+            },
+            beam: BeamSettings {
+                step_m: 1.0,
+                max_steps: 10,
+                max_range_m: 50.0,
+                store_ray_paths: false,
+                show_progress: false,
+                atomic_progress_counter: false,
+                integration_method: IntegrationMethod::Euler,
+            },
+        }
+    }
+
+    #[test]
+    fn init_ssp_builds_expected_shape_and_indexing() {
+        let x = vec![0.0, 1.0];
+        let y = vec![0.0, 1.0];
+        let z = vec![0.0, 1.0];
+        let mut c_m_s = Vec::new();
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    c_m_s.push(1500.0 + 100.0 * i as f32 + 10.0 * j as f32 + k as f32);
+                }
+            }
+        }
+        let cfg = base_config_with_ssp(x, y, z, c_m_s);
+        let ssp = init_ssp(&cfg);
+
+        assert_eq!(ssp.c.dim(), (2, 2, 2));
+        assert!((ssp.c[[1, 0, 1]] - 1601.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn interpolate_all_with_cursor_is_stable_on_corners_and_boundaries() {
+        let x = vec![0.0, 1.0];
+        let y = vec![0.0, 1.0];
+        let z = vec![0.0, 1.0];
+        let mut c_m_s = Vec::new();
+        for &xi in &x {
+            for &yi in &y {
+                for &zi in &z {
+                    c_m_s.push(1500.0 + xi + 2.0 * yi + 3.0 * zi);
+                }
+            }
+        }
+
+        let cfg = base_config_with_ssp(x, y, z, c_m_s);
+        let ssp = init_ssp(&cfg);
+        let mut cursor = init_ssp_cursor([0.0, 0.0, 0.0], &ssp);
+
+        let (c_corner, grad_corner, _) = interpolate_all_with_cursor([0.0, 0.0, 0.0], &ssp, &mut cursor);
+        assert!((c_corner - 1500.0).abs() < 1.0e-5);
+        assert!((grad_corner[0] - 1.0).abs() < 1.0e-5);
+        assert!((grad_corner[1] - 2.0).abs() < 1.0e-5);
+        assert!((grad_corner[2] - 3.0).abs() < 1.0e-5);
+
+        let (c_boundary, grad_boundary, _) =
+            interpolate_all_with_cursor([0.5, 1.0, 0.5], &ssp, &mut cursor);
+        assert!((c_boundary - 1504.0).abs() < 1.0e-5);
+        assert!(grad_boundary.iter().all(|g| g.is_finite()));
+    }
+
+    #[test]
+    fn reduce_step_to_ssp_interfaces_returns_smallest_positive_crossing() {
+        let x = vec![0.0, 10.0];
+        let y = vec![0.0, 10.0];
+        let z = vec![0.0, 10.0];
+        let cfg = base_config_with_ssp(x, y, z, vec![1500.0; 8]);
+        let ssp = init_ssp(&cfg);
+
+        let pos = [2.0, 3.0, 4.0];
+        let cursor = init_ssp_cursor(pos, &ssp);
+
+        let h_forward = reduce_step_to_ssp_interfaces(pos, [1.0, 0.1, 0.2], 100.0, &ssp, &cursor);
+        assert!((h_forward - 8.0).abs() < 1.0e-6);
+        assert!(h_forward > 0.0 && h_forward <= 100.0);
+
+        let h_backward =
+            reduce_step_to_ssp_interfaces(pos, [-1.0, -0.1, -0.2], 100.0, &ssp, &cursor);
+        assert!((h_backward - 2.0).abs() < 1.0e-6);
+        assert!(h_backward > 0.0 && h_backward <= 100.0);
+    }
+}

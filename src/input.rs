@@ -274,4 +274,122 @@ pub mod config {
             }
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn base_config() -> SimulationConfig {
+            SimulationConfig {
+                ssp: SoundSpeed {
+                    x_ssp_m: vec![0.0, 10.0],
+                    y_ssp_m: vec![0.0, 10.0],
+                    z_ssp_m: vec![0.0, 10.0],
+                    c_m_s: vec![1500.0; 8],
+                },
+                bathymetry: Bathymetry {
+                    x_bty_m: vec![0.0, 10.0],
+                    y_bty_m: vec![0.0, 10.0],
+                    z_bty_m: vec![100.0; 4],
+                    water_density_g_cm3: Some(1.0),
+                    bottom_model: BottomBoundaryModel::Rigid,
+                },
+                source: Source {
+                    position: [0.0, 0.0, 5.0],
+                    freq_hz: vec![200.0],
+                    launch_elev_deg: vec![0.0],
+                    launch_azim_deg: vec![0.0],
+                },
+                receivers: Receivers {
+                    config_type: "grid".to_string(),
+                    x_rcvr_m: vec![0.0],
+                    y_rcvr_m: vec![5.0],
+                    z_rcvr_m: vec![5.0],
+                },
+                beam: BeamSettings {
+                    step_m: 1.0,
+                    max_steps: 10,
+                    max_range_m: 50.0,
+                    store_ray_paths: false,
+                    show_progress: false,
+                    atomic_progress_counter: false,
+                    integration_method: IntegrationMethod::Euler,
+                },
+            }
+        }
+
+        #[test]
+        fn validate_rejects_invalid_beam_settings() {
+            let mut cfg = base_config();
+            cfg.beam.step_m = 0.0;
+            cfg.beam.max_steps = 0;
+            cfg.beam.max_range_m = -1.0;
+
+            let err = cfg.validate().unwrap_err().to_string();
+            assert!(err.contains("beam: step_m must be positive"));
+            assert!(err.contains("beam: max_steps must be > 0"));
+            assert!(err.contains("beam: max_range_m must be positive"));
+        }
+
+        #[test]
+        fn validate_normalizes_negative_depths_with_warnings() {
+            let mut cfg = base_config();
+            cfg.ssp.z_ssp_m = vec![-10.0, 20.0];
+            cfg.source.position[2] = -25.0;
+            cfg.receivers.z_rcvr_m = vec![-7.0, 3.0];
+
+            let warnings = cfg.validate().expect("config should be normalized");
+
+            assert!(warnings.iter().any(|w| w.contains("ssp: z_ssp_m value")));
+            assert!(warnings.iter().any(|w| w.contains("source: z position")));
+            assert!(warnings.iter().any(|w| w.contains("receivers: z_rcvr_m value")));
+            assert_eq!(cfg.ssp.z_ssp_m, vec![10.0, 20.0]);
+            assert_eq!(cfg.source.position[2], 25.0);
+            assert_eq!(cfg.receivers.z_rcvr_m, vec![7.0, 3.0]);
+        }
+
+        #[test]
+        fn validate_rejects_unknown_receiver_config_type() {
+            let mut cfg = base_config();
+            cfg.receivers.config_type = "mesh".to_string();
+
+            let err = cfg.validate().unwrap_err().to_string();
+            assert!(err.contains("receivers: config_type must be \"grid\" or \"array\""));
+        }
+
+        #[test]
+        fn validate_rejects_non_physical_bottom_model_parameters() {
+            let mut acoustic_cfg = base_config();
+            acoustic_cfg.bathymetry.bottom_model = BottomBoundaryModel::Acoustic {
+                compressional_speed_m_s: -1600.0,
+                density_g_cm3: -1.8,
+                compressional_attenuation_db_per_wavelength: Some(-0.1),
+            };
+            let acoustic_err = acoustic_cfg.validate().unwrap_err().to_string();
+            assert!(acoustic_err.contains("acoustic compressional_speed_m_s must be positive"));
+            assert!(acoustic_err.contains("acoustic density_g_cm3 must be positive"));
+            assert!(
+                acoustic_err
+                    .contains("acoustic compressional_attenuation_db_per_wavelength must be >= 0")
+            );
+
+            let mut elastic_cfg = base_config();
+            elastic_cfg.bathymetry.bottom_model = BottomBoundaryModel::Elastic {
+                compressional_speed_m_s: -1600.0,
+                shear_speed_m_s: -800.0,
+                density_g_cm3: -2.0,
+                compressional_attenuation_db_per_wavelength: Some(-0.2),
+                shear_attenuation_db_per_wavelength: Some(-0.3),
+            };
+            let elastic_err = elastic_cfg.validate().unwrap_err().to_string();
+            assert!(elastic_err.contains("elastic compressional_speed_m_s must be positive"));
+            assert!(elastic_err.contains("elastic shear_speed_m_s must be positive"));
+            assert!(elastic_err.contains("elastic density_g_cm3 must be positive"));
+            assert!(
+                elastic_err
+                    .contains("elastic compressional_attenuation_db_per_wavelength must be >= 0")
+            );
+            assert!(elastic_err.contains("elastic shear_attenuation_db_per_wavelength must be >= 0"));
+        }
+    }
 }

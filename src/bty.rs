@@ -253,3 +253,92 @@ fn bilinear_interpolation_with_indices(
 
     c
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::config::{
+        Bathymetry, BeamSettings, BottomBoundaryModel, IntegrationMethod, Receivers, SimulationConfig,
+        SoundSpeed, Source,
+    };
+
+    fn base_config_with_bty(x: Vec<f32>, y: Vec<f32>, z_bty_m: Vec<f32>) -> SimulationConfig {
+        SimulationConfig {
+            ssp: SoundSpeed {
+                x_ssp_m: vec![0.0, 10.0],
+                y_ssp_m: vec![0.0, 10.0],
+                z_ssp_m: vec![0.0, 10.0],
+                c_m_s: vec![1500.0; 8],
+            },
+            bathymetry: Bathymetry {
+                x_bty_m: x,
+                y_bty_m: y,
+                z_bty_m,
+                water_density_g_cm3: Some(1.0),
+                bottom_model: BottomBoundaryModel::Rigid,
+            },
+            source: Source {
+                position: [0.0, 0.0, 5.0],
+                freq_hz: vec![100.0],
+                launch_elev_deg: vec![0.0],
+                launch_azim_deg: vec![0.0],
+            },
+            receivers: Receivers {
+                config_type: "grid".to_string(),
+                x_rcvr_m: vec![0.0],
+                y_rcvr_m: vec![0.0],
+                z_rcvr_m: vec![5.0],
+            },
+            beam: BeamSettings {
+                step_m: 1.0,
+                max_steps: 10,
+                max_range_m: 50.0,
+                store_ray_paths: false,
+                show_progress: false,
+                atomic_progress_counter: false,
+                integration_method: IntegrationMethod::Euler,
+            },
+        }
+    }
+
+    #[test]
+    fn init_bty_and_interpolation_match_expected_values() {
+        let x = vec![0.0, 10.0];
+        let y = vec![0.0, 10.0];
+        let mut z_bty_m = Vec::new();
+        for &xi in &x {
+            for &yi in &y {
+                z_bty_m.push(100.0 + xi + 2.0 * yi);
+            }
+        }
+
+        let cfg = base_config_with_bty(x, y, z_bty_m);
+        let bty = init_bty(&cfg);
+
+        assert!((bty.z[[1, 1]] - 130.0).abs() < 1.0e-6);
+
+        let corner_cursor = init_bty_cursor([0.0, 10.0, 0.0], &bty);
+        let z_corner = interpolate_bty_from_cursor([0.0, 10.0, 0.0], &bty, &corner_cursor);
+        assert!((z_corner - 120.0).abs() < 1.0e-6);
+
+        let center_cursor = init_bty_cursor([5.0, 5.0, 0.0], &bty);
+        let z_center = interpolate_bty_from_cursor([5.0, 5.0, 0.0], &bty, &center_cursor);
+        assert!((z_center - 115.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn reduce_step_to_bty_segments_returns_smallest_positive_crossing() {
+        let cfg = base_config_with_bty(vec![0.0, 10.0], vec![0.0, 10.0], vec![100.0; 4]);
+        let bty = init_bty(&cfg);
+        let pos = [2.0, 3.0, 4.0];
+        let cursor = init_bty_cursor(pos, &bty);
+
+        let h_forward = reduce_step_to_bty_segments(pos, [1.0, 0.5, 0.0], 100.0, &bty, &cursor);
+        assert!((h_forward - 8.0).abs() < 1.0e-6);
+        assert!(h_forward > 0.0 && h_forward <= 100.0);
+
+        let h_backward = reduce_step_to_bty_segments(pos, [-1.0, -0.2, 0.0], 100.0, &bty, &cursor);
+        assert!((h_backward - 2.0).abs() < 1.0e-6);
+        assert!(h_backward > 0.0 && h_backward <= 100.0);
+    }
+}

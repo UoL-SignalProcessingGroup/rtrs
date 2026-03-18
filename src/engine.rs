@@ -208,3 +208,67 @@ pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureFiel
 
     return (ray_paths, pressure_field);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::config::{
+        Bathymetry, BeamSettings, BottomBoundaryModel, IntegrationMethod, Receivers, SimulationConfig,
+        SoundSpeed, Source,
+    };
+
+    fn tiny_config() -> SimulationConfig {
+        SimulationConfig {
+            ssp: SoundSpeed {
+                x_ssp_m: vec![0.0, 20.0],
+                y_ssp_m: vec![0.0, 20.0],
+                z_ssp_m: vec![0.0, 20.0],
+                c_m_s: vec![1500.0; 8],
+            },
+            bathymetry: Bathymetry {
+                x_bty_m: vec![0.0, 20.0],
+                y_bty_m: vec![0.0, 20.0],
+                z_bty_m: vec![100.0; 4],
+                water_density_g_cm3: Some(1.0),
+                bottom_model: BottomBoundaryModel::Rigid,
+            },
+            source: Source {
+                position: [0.0, 0.0, 5.0],
+                freq_hz: vec![100.0],
+                launch_elev_deg: vec![0.0],
+                launch_azim_deg: vec![0.0],
+            },
+            receivers: Receivers {
+                config_type: "grid".to_string(),
+                x_rcvr_m: vec![0.0],
+                y_rcvr_m: vec![5.0],
+                z_rcvr_m: vec![5.0],
+            },
+            beam: BeamSettings {
+                step_m: 1.0,
+                max_steps: 20,
+                max_range_m: 10.0,
+                store_ray_paths: false,
+                show_progress: false,
+                atomic_progress_counter: false,
+                integration_method: IntegrationMethod::Euler,
+            },
+        }
+    }
+
+    #[test]
+    fn core_produces_expected_shape_and_numeric_sanity() {
+        let cfg = tiny_config();
+        let (ray_paths, pressure_field) = core(&cfg);
+
+        assert!(ray_paths.is_none());
+        assert_eq!(pressure_field.pressure.dim(), (1, 1, 1, 1));
+        assert!(pressure_field
+            .pressure
+            .iter()
+            .all(|v| v.re.is_finite() && v.im.is_finite()));
+        assert!(pressure_field.amplitude.iter().all(|a| a.is_finite()));
+        assert!(pressure_field.delay_s.iter().all(|d| !d.is_nan()));
+        assert!(pressure_field.delay_s.iter().any(|d| d.is_finite()));
+    }
+}
