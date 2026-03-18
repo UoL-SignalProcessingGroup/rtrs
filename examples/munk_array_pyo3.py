@@ -50,12 +50,17 @@ env_m = {
     "beam": {
         "step_m": 10.0,
         "max_steps": 100_000,
-        "max_range_m": 50_000.0
+        "max_range_m": 50_000.0,
+        "store_ray_paths": True,
+        "intergration_method": "rk2"
     }
 }
 
 # Call the Rust engine via PyO3 binding
 result = rtrs.run_simulation(env_m)
+
+for key in result.keys():
+    print(f"{key}: {type(result[key])}")
 
 # Extract ray paths and pressure_field
 ray_paths = result["ray_paths"]

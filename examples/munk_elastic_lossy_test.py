@@ -45,7 +45,7 @@ env_m = {
         "position": [0.0, 0.0, 10.0],
         "freq_hz": [200.0],
         # "freq_hz": np.linspace(1.0, 1000.0, 1000).tolist(),
-        "launch_elev_deg": np.linspace(-75.0, 75.0, 725).tolist(),
+        "launch_elev_deg": np.linspace(-75.0, 75.0, 72).tolist(),
         "launch_azim_deg": np.linspace(-45.0, 45.0, 60).tolist()
     },
     "receivers": {
@@ -62,6 +62,8 @@ env_m = {
         "max_range_m": 50_000.0,
         "store_ray_paths": False,
         "integration_method": "rk2",
+        "show_progress": True,
+        "atomic_progress_counter": True
     }
 }
 

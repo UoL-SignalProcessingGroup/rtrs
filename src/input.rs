@@ -216,6 +216,8 @@ pub mod config {
         pub store_ray_paths: bool,
         #[serde(default = "default_false")]
         pub show_progress: bool,
+        #[serde(default = "default_false")]
+        pub atomic_progress_counter: bool,
         #[serde(default = "default_integration_method")]
         pub integration_method: IntegrationMethod,
     }

@@ -289,6 +289,7 @@ def make_env_json(x_reg, y_reg, bty_reg, z_reg, c_reg):
             "max_range_m": 25_000.0,
             "store_ray_paths": False,
             "show_progress": True,
+            "atomic_progress_counter": True,
             "integration_method": "rk2",
         },
     }

@@ -7,6 +7,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use ndarray::Zip;
 use rayon::prelude::*;
 use std::f32::consts::PI;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::time::Instant;
 
 fn merge_pressure_fields(dst: &mut PressureField, src: &PressureField) {
     Zip::from(&mut dst.pressure)
@@ -66,6 +69,7 @@ pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureFiel
     // Process rays in parallel with worker-local accumulation and reduce
     let store_ray_paths = cfg.beam.store_ray_paths;
     let show_progress = cfg.beam.show_progress;
+    let use_atomic_progress_counter = cfg.beam.atomic_progress_counter;
     let n_rays = angle_pairs.len();
     let target_chunks = (rayon::current_num_threads() * 2).max(1);
     let chunk_size = if n_rays == 0 {
@@ -73,7 +77,7 @@ pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureFiel
     } else {
         (n_rays + target_chunks - 1) / target_chunks
     };
-    let progress = if show_progress && n_rays > 0 {
+    let progress = if show_progress && !use_atomic_progress_counter && n_rays > 0 {
         let pb = ProgressBar::new(n_rays as u64);
         let style = ProgressStyle::with_template(
             "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {percent:>3}% eta {eta_precise}",
@@ -86,6 +90,21 @@ pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureFiel
         None
     };
     let progress_for_workers = progress.clone();
+    let completed = if show_progress && use_atomic_progress_counter && n_rays > 0 {
+        Some(Arc::new(AtomicUsize::new(0)))
+    } else {
+        None
+    };
+    let last_print_ms = if show_progress && use_atomic_progress_counter && n_rays > 0 {
+        Some(Arc::new(AtomicU64::new(0)))
+    } else {
+        None
+    };
+    let start = if show_progress && use_atomic_progress_counter && n_rays > 0 {
+        Some(Instant::now())
+    } else {
+        None
+    };
 
     let (mut indexed_paths, pressure_field) = angle_pairs
         .par_chunks(chunk_size)
@@ -122,6 +141,33 @@ pub fn core(cfg: &SimulationConfig) -> (Option<Vec<Vec<[f32; 3]>>>, PressureFiel
                 }
                 if let Some(pb) = &progress_for_workers {
                     pb.inc(1);
+                }
+            }
+
+            if let (Some(completed), Some(last_print_ms), Some(start)) =
+                (&completed, &last_print_ms, &start)
+            {
+                let done = completed.fetch_add(chunk.len(), Ordering::Relaxed) + chunk.len();
+                let elapsed = start.elapsed();
+                let elapsed_ms = elapsed.as_millis() as u64;
+                let prev_ms = last_print_ms.load(Ordering::Relaxed);
+
+                // Limit prints to roughly every 5 seconds, always print at completion.
+                if elapsed_ms.saturating_sub(prev_ms) >= 5000 || done == n_rays {
+                    if last_print_ms
+                        .compare_exchange(prev_ms, elapsed_ms, Ordering::SeqCst, Ordering::Relaxed)
+                        .is_ok()
+                    {
+                        let pct = 100.0 * done as f64 / n_rays as f64;
+                        let secs = elapsed.as_secs_f64();
+                        let rate = done as f64 / secs.max(1e-9);
+                        let remaining = n_rays.saturating_sub(done);
+                        let eta = remaining as f64 / rate.max(1e-9);
+
+                        println!(
+                            "Progress: {done}/{n_rays} ({pct:.1}%) | elapsed {secs:.1}s | {rate:.0} rays/s | ETA {eta:.1}s"
+                        );
+                    }
                 }
             }
 
