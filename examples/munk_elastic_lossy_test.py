@@ -63,7 +63,7 @@ env_m = {
         "store_ray_paths": False,
         "integration_method": "rk2",
         "show_progress": True,
-        "atomic_progress_counter": True
+        "atomic_progress_counter": False
     }
 }
 

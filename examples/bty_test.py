@@ -50,7 +50,8 @@ env_bty = {
     "beam": {
         "step_m": 25.0,
         "max_steps": 1_000_000,
-        "max_range_m": 30_000.0
+        "max_range_m": 30_000.0,
+        "store_ray_paths": True,
     }
 }
 

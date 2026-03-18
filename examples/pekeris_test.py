@@ -39,8 +39,7 @@ env_p = {
         "position": [0.0, 0.0, 25.0],
         "freq_hz": [50.0],
         "launch_elev_deg": np.linspace(-15.0, 15.0, 500).tolist(),
-        # "launch_azim_deg": np.linspace(-1.0, 1.0, 3).tolist()
-        "launch_azim_deg": [0.0]
+        "launch_azim_deg": np.linspace(-0.1, 0.1, 3).tolist()
     },
     "receivers": {
         "config_type": "grid",

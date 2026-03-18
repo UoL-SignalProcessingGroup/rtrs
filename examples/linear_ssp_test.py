@@ -33,12 +33,19 @@ env = {
         "y_bty_m": [0.0, 30000.0],
         "z_bty_m": np.array([[water_depth, water_depth],
                               [water_depth, water_depth]]).flatten(order='C').tolist(),
+        "bottom_model": {
+            "model": "acoustic",
+            "compressional_speed_m_s": 1600.0,
+            "density_g_cm3": 1.5,
+            "compressional_attenuation_db_per_wavelength": 0.2
+        },
+        "water_density_g_cm3": 1.0,              # g/cm3
     },
     "source": {
-        "position": [0.0, 0.0, 25.0],
+        "position": [0.0, 0.0, 50.0],
         "freq_hz": [100.0],
-        "launch_elev_deg": np.linspace(-70.0, 70.0, 139).tolist(),
-        "launch_azim_deg": np.linspace(-1.0, 1.0, 5).tolist()
+        "launch_elev_deg": np.linspace(-15.0, 15.0, 15).tolist(),
+        "launch_azim_deg": np.linspace(-0.1, 0.1, 3).tolist()
     },
     "receivers": {
         "config_type": "grid",
@@ -47,9 +54,11 @@ env = {
         "z_rcvr_m": np.linspace(0.0, water_depth, 100).tolist()
     },
     "beam": {
-        "step_m": 5.0,
-        "max_steps": 40_000,
-        "max_range_m": 30_000.0
+        "step_m": 10.0,
+        "max_steps": 10_000,
+        "max_range_m": 30_000.0,
+        "store_ray_paths": True,
+        "integration_method": "rk2",
     }
 }
 

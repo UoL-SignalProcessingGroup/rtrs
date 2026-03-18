@@ -47,7 +47,8 @@ env_m = {
     "beam": {
         "step_m": 10.0,
         "max_steps": 100_000,
-        "max_range_m": 50_000.0
+        "max_range_m": 50_000.0,
+        "store_ray_paths": True,
     }
 }
 

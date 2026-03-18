@@ -94,7 +94,7 @@ class BroadbandTest:
         return source_spectrum, frequencies
 
 fs = 400        # Sampling frequency (Hz)
-t = np.arange(0.0, 1.5, 1.0/fs)      # Time vector from 0 to 1 second
+t = np.arange(0.0, 1.0, 1.0/fs)      # Time vector from 0 to 1 second
 f0 = 50.0      # Center frequency of the Gaussian pulse (Hz)
 amp = 1.0      # Amplitude of the pulse
 source_len = 4
@@ -147,7 +147,7 @@ if os.path.exists(outfile):
     os.remove(outfile)
 
 
-env_bbp = {
+env_bb_pekeris = {
     "ssp": {
         "x_ssp_m": [0.0, 30000.0],
         "y_ssp_m": [0.0, 30000.0],
@@ -170,7 +170,7 @@ env_bbp = {
     "source": {
         "position": [0.0, 0.0, 25.0],
         "freq_hz": frequencies.tolist(),
-        "launch_elev_deg": np.linspace(-25.0, 25.0, 1000).tolist(),
+        "launch_elev_deg": np.linspace(-15.0, 15.0, 500).tolist(),
         "launch_azim_deg": np.linspace(-0.1, 0.1, 3).tolist()
     },
     "receivers": {
@@ -182,11 +182,13 @@ env_bbp = {
     "beam": {
         "step_m": 10.0,
         "max_steps": 25_000,
-        "max_range_m": 35_000.0
+        "max_range_m": 35_000.0,
+        "store_ray_paths": False,
+        "integration_method": "rk2",
     }
 }
 
-env_bbm = {
+env_bb_munk = {
     "ssp": {
         "x_ssp_m": [0.0, 50000.0],
         "y_ssp_m": [0.0, 50000.0],
@@ -225,7 +227,7 @@ env_bbm = {
 }
 
 with open(jsonfile, "w") as f:
-    json.dump(env_bbp, f, indent=2)
+    json.dump(env_bb_pekeris, f, indent=2)
 
 # run rtrs with the JSON-like input (keeps original behavior of the example)
 os.system(f"cargo run --release  {jsonfile}")
@@ -249,7 +251,10 @@ else:
 pressure_scaled = pressure * source_spectrum_used[:, None, None, None]
 
 # inverse transform back to time domain using irfft. Specify n to get original time length.
-pressure_time = np.fft.irfft(pressure_scaled, axis=0, n=bbt.n)
+# rtrs stores frequency-domain pressure using an exp(+i*omega*t) phase convention,
+# while numpy FFT routines assume exp(-i*omega*t). Conjugate to match conventions
+# and avoid a time-reversed waveform in the reconstructed series.
+pressure_time = np.fft.irfft(np.conj(pressure_scaled), axis=0, n=bbt.n)
 
 plt.figure()
 plt.subplot(2,1,1)

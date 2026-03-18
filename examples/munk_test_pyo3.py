@@ -1,13 +1,3 @@
-"""
-Example using the PyO3 binding rtrs.run_simulation to run the Munk SSP test in-memory.
-Build and install the extension first with:
-
-    pip install maturin
-    maturin develop --release --features python
-
-Then run this script with the Python environment where the extension was installed.
-"""
-
 import numpy as np
 import python_utils
 import matplotlib.pyplot as plt
