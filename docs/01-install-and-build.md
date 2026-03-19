@@ -1,6 +1,6 @@
 # Install and Build
 
-This project is primarily a standalone Rust binary that reads a JSON config and writes a JSON output file.
+This project is primarily a standalone Rust binary that can be accessed through a python interface or that reads a JSON config and writes a JSON output file.
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ Example:
 - Input: `examples/testlinear.json`
 - Output: `examples/testlinear.out.json`
 
-## Python Environment (Optional)
+## Python Environment (Optional, but recommended)
 
 If you run example scripts that call the binary and/or use Python plotting helpers:
 
@@ -38,7 +38,7 @@ source .venv/bin/activate
 pip install -e ".[viz]"
 ```
 
-## Python Bindings (Optional)
+## Python Bindings (Optional, but recommended)
 
 For iterative Rust + Python development:
 
@@ -62,7 +62,5 @@ Run a specific example script:
 Generate Rust docs for local code inspection:
 
 ```bash
-cargo doc --no-deps --open
+cargo doc --no-deps --features python --open
 ```
-
-Note: API docs are optional here; for this project, the primary interface is the JSON input dictionary documented in `docs/02-input-reference.md`.

@@ -8,9 +8,9 @@ Output path rule:
 
 Root structure is written in `src/output.rs` and contains:
 
-- `src`
+- `src` (useful for debug metadata and post-processing, not available in Python bindings)
 - `ray_paths` (only when enabled)
-- `bty`
+- `bty`(useful for debug metadata and post-processing, not available in Python bindings)
 - `pressure_field`
 
 ## `src`

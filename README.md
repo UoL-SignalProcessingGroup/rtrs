@@ -151,6 +151,7 @@ Hopefully, pre-built wheels are distributed per platform and Python version via 
 - Low frequency correction
 - Performance improvements
 - Multiple sources and Source directivity patterns
+- Delay and amplitude output
 
 ## License
 MIT License. See LICENSE file for details.

@@ -4,7 +4,7 @@ This page shows how to run `rtrs` from Python.
 
 There are two common paths:
 
-- PyO3 bindings (`import rtrs`) for direct in-memory calls.
+- PyO3 bindings (`import rtrs`) for direct in-memory calls (recommended).
 - Subprocess CLI (`cargo run ...`) for file-based workflows.
 
 ## 1. Setup
