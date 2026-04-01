@@ -153,6 +153,9 @@ Hopefully, pre-built wheels are distributed per platform and Python version via 
 - Multiple sources and Source directivity patterns
 - Delay and amplitude output
 
+## Name
+The name "rtrs" means ray tracing rust (rs after the rust file extension `.rs`). The name in text is always all in lower case matching the name in code `rtrs`.
+
 ## License
 MIT License. See LICENSE file for details.
 
