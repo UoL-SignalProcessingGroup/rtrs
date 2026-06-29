@@ -2,15 +2,15 @@
 
 3D Underwater acoustic ray tracing with arbitrary Cartesian receiver coordinates, geometry independent broadband beam tracing, and Python bindings.
 
-## Current Features
+## Features
 - Exclusively 3D ray / beam tracing
+- Efficient wideband beam tracing using Gaussian beams (ray geometry is traced as frequency independent, then the beam influence is calculated at receiver coordinates for each frequency)
+- Python bindings via pyo3 (No IO files)
+- Cartesian receiver representation for grids and arrays
 - Surface (vacuum) and bottom (rigid, lossy acoustic, lossy elastic) reflections
 - 3D sound speed profiles ( $c(x,y,z)$ )
 - 2D bathymetry ( $b(x,y)$ )
-- Efficient wideband beam tracing using Gaussian beams (ray geometry is traced as frequency independent, then the beam influence is calculated at receiver coordinates for each frequency)
-- Python bindings via pyo3
-- IO with json files
-- Receiver representation for grids and arrays
+- Optional IO with json files
 - Parallel processing over the number of rays / beams with rayon
 - Optional no-ray-path mode to reduce memory and output size
 - Euler and RK2 integration methods
@@ -152,6 +152,9 @@ Hopefully, pre-built wheels are distributed per platform and Python version via 
 - Performance improvements
 - Multiple sources and Source directivity patterns
 - Delay and amplitude output
+
+## Name
+The name "rtrs" means ray tracing rust (rs after the rust file extension `.rs`). The name in text is always all in lower case matching the name in code `rtrs`.
 
 ## License
 MIT License. See LICENSE file for details.
