@@ -106,7 +106,7 @@ fn scale_beam(elev: f32, d_elev: f32, d_azim: f32, ray: &mut [Ray]) {
     for r in ray.iter_mut() {
         r.amplitude *= ratio1 * r.c;
     }
-    // DetQ with ORIGINAL q’s (then scale q’s)
+    // DetQ with ORIGINAL q's (then scale q's)
     for r in ray.iter_mut() {
         r.det_q = r.q_tilde[0] * r.q_hat[1] - r.q_tilde[1] * r.q_hat[0];
     }

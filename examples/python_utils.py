@@ -320,7 +320,7 @@ def launch_sound_speed_dashboard(
             label = f'{label}, z_bty={bty_xy_m[iy, ix]:.1f} m'
         return _profile_figure(ix, iy), label
 
-    print(f'\n  Sound speed dashboard running → http://{host}:{port}/\n')
+    print(f'\n  Sound speed dashboard running -> http://{host}:{port}/\n')
     app.run(host=host, port=int(port), debug=bool(debug))
 
 

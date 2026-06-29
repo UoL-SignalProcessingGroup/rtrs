@@ -17,7 +17,7 @@ pub fn reflect_boundaries(
     let boundary_normal_for_paraxial: [f32; 3];
     let incident_slowness_for_paraxial: [f32; 3];
 
-    // Determine which boundary (surface or bottom) — handle only one per step
+    // Determine which boundary (surface or bottom) - handle only one per step
     // Surface: z < 0.0
     if ray.position[2] <= 0.0 && ray.direction[2] < 0.0 {
         incident_slowness_for_paraxial = ray.direction;
