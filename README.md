@@ -1,6 +1,6 @@
 # rtrs
 
-3D Underwater acoustic ray tracing with arbitrary Cartesian receiver coordinates, geometry independent broadband beam tracing, and Python bindings.
+3D Underwater acoustic ray tracing with arbitrary Cartesian receiver coordinates, geometry independent broadband beam tracing, and Python bindings. It is used in [Blue Pebble](https://github.com/UoL-SignalProcessingGroup/blue-pebble): sonar signal processing plugin for [Stone Soup](https://stonesoup.readthedocs.io/en/v1.9.1/). 
 
 ## Features
 - Exclusively 3D ray / beam tracing
@@ -138,9 +138,9 @@ maturin develop --release
 
 See `examples/` for usage with and without python bindings. Note that in the examples which do not use the python bindings, the program is compiled and run in release mode with cargo from within a python script. 
 
-### Future PyPI Release
+### PyPI Release
 
-When published to PyPI, the package can be installed with:
+Pre-built python wheels can be downloaded from pypi:
 ```bash
 pip install rtrs
 ```
@@ -155,6 +155,21 @@ Hopefully, pre-built wheels are distributed per platform and Python version via 
 
 ## Name
 The name "rtrs" means ray tracing rust (rs after the rust file extension `.rs`). The name in text is always all in lower case matching the name in code `rtrs`.
+
+## Citation
+
+If you use rtrs in academic work, please cite the associated conference paper and the software release (via DOI when available).
+
+```bibtex
+@inproceedings{wakefield2026sonar,
+  title={A Sonar Signal Processing Plugin for Stone Soup},
+  author={Wakefield, Joshua J and Boulton, Finley and Colquitt, Daniel J. and Ralph, Jason F. and Williams, Duncan P.},
+  booktitle={2026 29th International Conference on Information Fusion (FUSION)},
+  pages={1--8},
+  year={2026},
+  organization={IEEE}
+}
+```
 
 ## License
 MIT License. See LICENSE file for details.
