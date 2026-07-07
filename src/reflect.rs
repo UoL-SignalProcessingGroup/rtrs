@@ -56,19 +56,28 @@ pub fn reflect_boundaries(
 
     // proceed to paraxial update below
     } else {
-        // Bottom: check against interpolated bottom depth
+        // Bottom: check against the interpolated (range-dependent) bottom depth.
         update_bty_cursor(ray.position, bty_field, bty_cursor);
         let z_bty = interpolate_bty_from_cursor(ray.position, bty_field, bty_cursor);
-        if ray.position[2] >= z_bty && ray.direction[2] > 0.0 {
+
+        // Local bottom normal, oriented to point out of the water and down into
+        // the seabed (positive-down convention, so normal[2] >= 0).
+        let (mut normal, _tangent) =
+            bottom_normal_from_cursor(ray.position, bty_field, bty_cursor);
+        if normal[2] < 0.0 {
+            normal = [-normal[0], -normal[1], -normal[2]];
+        }
+
+        // The ray has hit the bottom when it lies at/below the seabed and is
+        // travelling into it. Testing the velocity against the bottom normal
+        // (rather than direction[2] > 0) also catches (near-)horizontal rays on a
+        // sloping seabed, where the bottom rises to meet a ray of fixed depth.
+        let into_bottom = ray.direction[0] * normal[0]
+            + ray.direction[1] * normal[1]
+            + ray.direction[2] * normal[2];
+        if ray.position[2] >= z_bty && into_bottom > 0.0 {
             let incident_slowness = ray.direction;
             incident_slowness_for_paraxial = incident_slowness;
-
-            // compute local bottom normal
-            let (mut normal, _tangent) =
-                bottom_normal_from_cursor(ray.position, bty_field, bty_cursor);
-            if normal[2] < 0.0 {
-                normal = [-normal[0], -normal[1], -normal[2]];
-            }
             boundary_normal_for_paraxial = normal;
 
             // intersect ray with local plane point
@@ -671,5 +680,28 @@ mod tests {
         let bottom_ray = bottom_history.last().unwrap();
         assert_eq!(bottom_ray.num_bottom_bounces, 0);
         approx_eq(bottom_ray.direction[2], -1.0 / TEST_C, 1.0e-12);
+    }
+
+    #[test]
+    fn horizontal_ray_reflects_off_rising_sloped_bottom() {
+        // Seabed rises from 8 m depth at x=0 to 2 m depth at x=10 (slope in +x).
+        // At x=6 the seabed is at 4.4 m, so a perfectly horizontal ray at 5 m
+        // depth has been overtaken by the rising bottom and must reflect even
+        // though its own vertical direction is zero (regression for a bottom
+        // crossing test that keyed off direction[2] > 0 instead of the normal).
+        let bty = make_bty_sloped_x(8.0, 2.0);
+        let mut history = vec![make_ray([6.0, 5.0, 5.0], [1.0 / TEST_C, 0.0, 0.0])];
+        let mut cursor = init_bty_cursor(history[0].position, &bty);
+        reflect_boundaries(&mut history, &bty, &mut cursor);
+        let ray = history.last().unwrap();
+        assert_eq!(
+            ray.num_bottom_bounces, 1,
+            "horizontal ray over a rising slope must reflect"
+        );
+        assert!(
+            ray.direction[2] < 0.0,
+            "reflected ray should head back up toward the surface: dz={}",
+            ray.direction[2]
+        );
     }
 }
